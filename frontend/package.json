@@ -1,0 +1,16 @@
+{
+  "name": "nine-asset-desk-pages",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build --base=./",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^4.27.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}
