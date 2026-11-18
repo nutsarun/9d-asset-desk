@@ -61,7 +61,7 @@ async function loadDirectory(){
  if(employeeListId){
   let url=path(employeeListId)+'?$top=100&$expand=fields';
   while(url){const page=await graph(url);remote.push(...(page.value||[]));url=page['@odata.nextLink'];}
-  remote=remote.map(x=>({empId:x.fields.EmployeeCode||'',name:x.fields.Title||'',department:x.fields.Department||'',position:x.fields.Position||'',email:x.fields.Email||'',contact:x.fields.Contact||'',_itemId:x.id}));
+  remote=remote.map(x=>({empId:x.fields.EmployeeCode||'',name:x.fields.Title||'',department:x.fields.Department||'',position:x.fields.Position||'',email:x.fields.Email||'',contact:x.fields.Contact||'',company:x.fields.Company||'Nine distribution co.,ltd',_itemId:x.id}));
  }
  const local=JSON.parse(localStorage.getItem('nine-employee-local-v2')||'[]');
  const merged=new Map();
@@ -100,19 +100,19 @@ window.nineEmployeeEdit=function(index){
  const e=directory[index]||{};
  const v=(id,k)=>document.getElementById(id).value=e[k]||'';
  document.getElementById('emp-index').value=index;
- v('emp-code','empId');v('emp-name','name');v('emp-department','department');v('emp-position','position');v('emp-email','email');v('emp-contact','contact');
+ v('emp-code','empId');v('emp-name','name');v('emp-department','department');v('emp-position','position');v('emp-email','email');v('emp-contact','contact');v('emp-company','company');
  document.getElementById('emp-modal').classList.remove('hidden');document.getElementById('emp-modal').classList.add('flex');
 };
 window.nineEmployeeSave=async function(ev){
  ev.preventDefault();if(!admin())return;
  const index=Number(document.getElementById('emp-index').value);
  const old=directory[index];
- const e={empId:document.getElementById('emp-code').value.trim(),name:document.getElementById('emp-name').value.trim(),department:document.getElementById('emp-department').value.trim(),position:document.getElementById('emp-position').value.trim(),email:document.getElementById('emp-email').value.trim(),contact:document.getElementById('emp-contact').value.trim()};
+ const e={empId:document.getElementById('emp-code').value.trim(),name:document.getElementById('emp-name').value.trim(),department:document.getElementById('emp-department').value.trim(),position:document.getElementById('emp-position').value.trim(),email:document.getElementById('emp-email').value.trim(),contact:document.getElementById('emp-contact').value.trim(),company:document.getElementById('emp-company')?.value||'Nine distribution co.,ltd'};
  if(!e.name)return;
  if(directory.some((x,i)=>i!==index && norm(x.name)===norm(e.name)))return showToast('ชื่อพนักงานซ้ำกับรายการเดิม','error');
  try{
   if(employeeListId){
-   const fields={Title:e.name,EmployeeCode:e.empId,Department:e.department,Position:e.position,Email:e.email,Contact:e.contact};
+   const fields={Title:e.name,EmployeeCode:e.empId,Department:e.department,Position:e.position,Email:e.email,Contact:e.contact,Company:e.company};
    if(old?._itemId){await graph(path(employeeListId,old._itemId)+'/fields','PATCH',fields,true); }
    else await graph(path(employeeListId),'POST',{fields},true);
    await loadDirectory();
@@ -165,7 +165,7 @@ async function checkinItem(a){
 window.nineCheckout=async function(ev){
  ev.preventDefault();if(!admin())return showToast('เฉพาะ Super Admin','error');
  const selected=checkoutCart.map(id=>assets.find(a=>a.id===id)).filter(Boolean);
- const employee={empId:document.getElementById('co-emp-id').value.trim(),name:document.getElementById('co-emp-name').value.trim(),department:document.getElementById('co-emp-dept').value.trim(),position:document.getElementById('co-emp-pos').value.trim(),contact:document.getElementById('co-emp-contact').value.trim()};
+ const employee={empId:document.getElementById('co-emp-id').value.trim(),name:document.getElementById('co-emp-name').value.trim(),department:document.getElementById('co-emp-dept').value.trim(),position:document.getElementById('co-emp-pos').value.trim(),contact:document.getElementById('co-emp-contact').value.trim(),company:directory.find(x=>norm(x.name)===norm(document.getElementById('co-emp-name').value))?.company||'Nine distribution co.,ltd'};
  const date=document.getElementById('co-date').value;
  if(!employee.name||!employee.empId||!selected.length)return showToast('กรุณาระบุพนักงานและเลือกอุปกรณ์','error');
  const button=ev.submitter;if(button)button.disabled=true;
@@ -176,7 +176,7 @@ window.nineCheckout=async function(ev){
    catch(e){errors.push(e.message);}
   }
   if(done.length){
-   const tx={docNo:'HO-'+Date.now(),type:'CHECKOUT',date,employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:document.getElementById('co-note').value})),note:document.getElementById('co-note').value,officerName:currentUser.name+' ('+currentUser.email+')'};
+   const tx={docNo:generateDocNumber('HO'),type:'CHECKOUT',date,employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:document.getElementById('co-note').value})),note:document.getElementById('co-note').value,officerName:currentUser.name+' ('+currentUser.email+')'};
    transactions.unshift(tx);
    sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions));
   }
@@ -195,11 +195,131 @@ window.nineCheckin=async function(ev,groupKey){
   try{await checkinItem(a);done.push(a);}catch(e){errors.push(e.message);}
  }
  if(done.length){
-  transactions.unshift({docNo:'RT-'+Date.now(),type:'CHECKIN',date:ev.target.querySelector('input[name="return_date"]').value,employee:grp.employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:'รับคืน'})),note:ev.target.querySelector('input[name="return_note"]').value,officerName:currentUser.name+' ('+currentUser.email+')'});
+  transactions.unshift({docNo:generateDocNumber('RT'),type:'CHECKIN',date:ev.target.querySelector('input[name="return_date"]').value,employee:grp.employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:'รับคืน'})),note:ev.target.querySelector('input[name="return_note"]').value,officerName:currentUser.name+' ('+currentUser.email+')'});
   sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions));
  }
  await refreshAssetData();showToast('คืนสำเร็จ '+done.length+' รายการ'+(errors.length?' / ผิดพลาด: '+errors.join(' | '):''),errors.length?'error':'success');
 };
+
+const ASSET_CODES={Notebook:'N',Monitor:'M',Smartphone:'S',Accessory:'A',Network:'W',Other:'O'};
+function assetPrefix(company,cat){return (String(company).startsWith('After')?'A9IT-':'9DIT-')+(ASSET_CODES[cat]||'O');}
+function nextAssetId(company,cat,ids=assets.map(a=>a.id)){
+ const prefix=assetPrefix(company,cat);let max=0;
+ for(const id of ids){const match=String(id).match(new RegExp('^'+prefix+'(\\d{4,})
+ ev.preventDefault();if(!admin())return showToast('เฉพาะ Super Admin','error');
+ const id=document.getElementById('asset-edit-mode').value;
+ const a=assets.find(x=>x.id===id);
+ const cat=document.getElementById('asset-category').value;
+ const list=NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'?'accessory':'computer'));
+ const company=document.getElementById('asset-company')?.value||'Nine distribution co.,ltd';
+ const hostname=document.getElementById('asset-hostname')?.value.trim()||'';
+ const fields={Title:document.getElementById('asset-id').value.trim(),Vendor:document.getElementById('asset-brand').value.trim(),Model:document.getElementById('asset-model').value.trim(),ItemType:cat,Status:document.getElementById('asset-status').value==='available'?'Stock':document.getElementById('asset-status').value==='repair'?'Repair':'Not available'};
+ fields[list.kind==='computer'?'Assetorserialnumber':'AssetorserialNumber']=document.getElementById('asset-serial').value.trim();
+ fields[list.kind==='computer'?'Company':'Owner']=list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
+ try{
+  if(hostname){if(await hasAssetColumn(list.id,'HostName'))fields.HostName=hostname;else throw Error('SharePoint List นี้ยังไม่มีคอลัมน์ HostName กรุณาเพิ่มคอลัมน์ Single line of text ชื่อ HostName');}
+  if(a){
+   if(a._sp.kind!==list.kind)throw Error('ไม่สามารถย้ายรายการข้าม List กรุณาสร้างรายการใหม่');
+   if(a.status==='assigned')throw Error('ห้ามแก้ข้อมูลทรัพย์สินขณะมีผู้ถือครอง');
+   await patchAsset(a,fields);
+  }else{
+   const allIds=await liveAssetIds();
+   fields.Title=nextAssetId(company,cat,allIds);
+   if(allIds.some(x=>String(x).toLowerCase()===fields.Title.toLowerCase()))throw Error('Asset ID ซ้ำ');
+   await graph(path(list.id),'POST',{fields},true);
+  }
+  closeAssetModal();await refreshAssetData();showToast('บันทึกทะเบียนทรัพย์สินลง SharePoint แล้ว','success');
+ }catch(e){showToast(e.message,'error');}
+};
+window.nineDeleteAsset=async function(id){
+ if(!admin())return showToast('เฉพาะ Super Admin','error');
+ const a=assets.find(x=>x.id===id);if(!a)return;
+ if(a.status==='assigned')return showToast('ห้ามลบอุปกรณ์ที่มีผู้ถือครอง','error');
+ if(!confirm('ยืนยันลบ Asset '+a.id+' ออกจาก SharePoint?'))return;
+ try{
+  const live=await currentAsset(a);
+  if(live.busy)throw Error('ห้ามลบเพราะมีผู้ใช้งาน');
+  await graph(path(a._sp.listId,a._sp.itemId),'DELETE',null,true,live.item['@odata.etag']);
+  await refreshAssetData();showToast('ลบอุปกรณ์จาก SharePoint แล้ว','success');
+ }catch(e){showToast(e.message,'error');}
+};
+const previousRenderAll=renderAll;
+renderAll=function(){previousRenderAll();renderEmployees();};
+const previousPopulate=populateEmployeePresets;
+populateEmployeePresets=function(){
+ previousPopulate();
+ const select=document.getElementById('co-preset-emp');
+ const keys=new Set([...select.options].map(o=>o.value));
+ for(const e of directory){const k=e.empId||e.name;if(!keys.has(k)){select.add(new Option(e.name+' ('+(e.department||'')+')',k));keys.add(k);}}
+};
+const prevFill=fillEmployeePreset;
+fillEmployeePreset=function(v){
+ const e=directory.find(x=>x.empId===v||x.name===v);
+ if(!e)return prevFill(v);
+ [['co-emp-id',e.empId||e.name],['co-emp-name',e.name],['co-emp-dept',e.department||'-'],['co-emp-pos',e.position],['co-emp-contact',e.email||e.contact]].forEach(([id,val])=>document.getElementById(id).value=val||'');
+};
+const prevToggle=toggleCartItem;
+toggleCartItem=function(id){
+ const a=assets.find(x=>x.id===id);
+ if(a && (a.status!=='available'||a.assignedTo)){return showToast('ไม่สามารถเบิกซ้ำ: อุปกรณ์ '+a.id+' มีผู้ใช้งานอยู่แล้ว','error');}
+ prevToggle(id);
+};
+const prevInventory=renderInventory;
+renderInventory=function(){
+ prevInventory();
+ if(!admin())return;
+ // Existing buttons dispatch to the safe Graph-backed functions.
+};
+submitCheckout=function(e){return window.nineCheckout(e);};
+submitCheckin=function(e,key){return window.nineCheckin(e,key);};
+saveAsset=function(e){return window.nineSaveAsset(e);};
+deleteAsset=function(id){return window.nineDeleteAsset(id);};
+const prevOpen=openAssetModal;
+openAssetModal=function(id=null){if(!admin())return showToast('เฉพาะ Super Admin','error');return prevOpen(id);};
+document.addEventListener('DOMContentLoaded',()=>{ensurePanel();document.getElementById('emp-add').hidden=true;});
+
+window.nineDirectory=()=>directory.map(x=>({...x}));
+window.nineEmployeeHasSharedList=()=>Boolean(employeeListId);
+window.nineEmployeeBulkUpsert=async function(rows){
+ if(!admin())throw Error('เฉพาะ Super Admin');
+ const done=[],errors=[];
+ for(const e of rows){
+  try{
+   const match=directory.find(x=>(e.empId&&x.empId===e.empId)||norm(x.name)===norm(e.name));
+   const fields={Title:e.name,EmployeeCode:e.empId||'',Department:e.department||'',Position:e.position||'',Email:e.email||'',Contact:e.contact||'',Company:e.company||'Nine distribution co.,ltd'};
+   if(employeeListId){if(match?._itemId)await graph(path(employeeListId,match._itemId)+'/fields','PATCH',fields,true);else await graph(path(employeeListId),'POST',{fields},true);}
+   else{if(match){Object.assign(match,e);match._derived=false;}else directory.push({...e,_derived:false});}
+   done.push(e.name);
+  }catch(err){errors.push(e.name+': '+err.message);}
+ }
+ if(employeeListId)await loadDirectory();else{localStorage.setItem('nine-employee-local-v2',JSON.stringify(directory.filter(x=>!x._derived)));renderEmployees();}
+ return {done,errors,shared:Boolean(employeeListId)};
+};
+
+window.nineAfterLogin=async function(){
+ ensurePanel();
+ const isAdmin=admin();
+ ['nav-checkout','nav-checkin','dashboard-quick-actions','btn-add-asset'].forEach(id=>document.getElementById(id)?.classList.toggle('hidden',!isAdmin));
+ const ele=document.getElementById('topbar-role-badge');if(ele&&isAdmin)ele.textContent='Super Admin — SharePoint (Nutsarun / Satit)';
+ transactions=JSON.parse(sessionStorage.getItem('nine-transactions-session')||'[]');
+ try{await loadDirectory();renderAll();}catch(e){console.warn(e);showToast('อ่านข้อมูลพนักงาน: '+e.message,'error');}
+};
+})();
+,'i'));if(match)max=Math.max(max,Number(match[1]));}
+ return prefix+String(max+1).padStart(4,'0');
+}
+window.nineNextAssetId=nextAssetId;
+async function liveAssetIds(){
+ const ids=[];
+ for(const list of NINE_GRAPH.lists){let url=path(list.id)+'?$top=100&$expand=fields';while(url){const result=await graph(url);for(const x of result.value||[]){if(x.fields?.Title)ids.push(x.fields.Title);if(x.fields?.HostName)ids.push(x.fields.HostName);}url=result['@odata.nextLink'];}}
+ return ids;
+}
+const columnsCache=new Map();
+async function hasAssetColumn(listId,column){
+ if(!columnsCache.has(listId)){let cols=[],url='https://graph.microsoft.com/v1.0/sites/'+SITE+'/lists/'+listId+'/columns?$top=200';while(url){const page=await graph(url);cols.push(...page.value||[]);url=page['@odata.nextLink'];}columnsCache.set(listId,new Set(cols.map(x=>x.name)));}
+ return columnsCache.get(listId).has(column);
+}
+
 window.nineSaveAsset=async function(ev){
  ev.preventDefault();if(!admin())return showToast('เฉพาะ Super Admin','error');
  const id=document.getElementById('asset-edit-mode').value;
