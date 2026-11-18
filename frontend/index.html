@@ -7,7 +7,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MSAL.js (Microsoft Authentication Library for Browser) -->
-    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js" onerror="this.onerror=null;this.src='https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js'"></script>
     <!-- Google Fonts: Sarabun & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2545,7 +2545,7 @@ function secureInitApp(){
  localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
  currentUser=null;
  assets=[];transactions=[];showLoginScreen();
- const hint=document.createElement('p'); hint.className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3';hint.textContent='เวอร์ชันเชื่อมต่อ SharePoint: ต้องตั้งค่า Microsoft Entra Application (Client) ID ก่อนเข้าใช้งาน ขณะนี้เปิดดูข้อมูลแบบอ่านอย่างเดียวเพื่อป้องกันการแก้ไขข้อมูลจริงโดยไม่ตั้งใจ';
+ const hint=document.createElement('p'); hint.className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3';hint.textContent='ตั้งค่า Microsoft Entra ของ Nine Distribution แล้ว กรุณาเข้าสู่ระบบด้วย Microsoft 365 เพื่ออ่านข้อมูลทรัพย์สินจาก SharePoint (โหมดอ่านอย่างเดียว)';
  document.querySelector('#login-screen .max-w-md')?.appendChild(hint);
 }
 quickDemoLogin=()=>showToast('ปิด Demo Login เพื่อความปลอดภัย กรุณาเข้าสู่ระบบด้วย Microsoft 365 จริง','error');
@@ -2571,12 +2571,34 @@ async function readGraphList(token,list) {
   };
  });
 }
+async function ensureMsalLoaded(){
+ if(window.msal?.PublicClientApplication)return window.msal;
+ const urls=[
+  'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+  'https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js',
+  'https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js'
+ ];
+ for(const src of urls){
+  try {
+   await new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src=src; script.async=true;
+    script.onload=resolve;
+    script.onerror=()=>reject(new Error('CDN unavailable'));
+    document.head.appendChild(script);
+   });
+   if(window.msal?.PublicClientApplication)return window.msal;
+  }catch(e){console.warn('MSAL CDN load failed',src,e);}
+ }
+ throw new Error('ไม่สามารถโหลด Microsoft Login Library ได้ กรุณาตรวจสอบการบล็อก CDN ในเครือข่าย');
+}
 initiateMicrosoftLogin=async function(){
  if(!ssoConfig.clientId||!ssoConfig.tenantId||ssoConfig.tenantId==='common'){
   showToast('ต้องใส่ Client ID และ Tenant ID ของบริษัทก่อน', 'error');openSsoSetupModal(true);return;
  }
  try{
-  const client=new msal.PublicClientApplication({auth:{clientId:ssoConfig.clientId,authority:'https://login.microsoftonline.com/'+ssoConfig.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});
+  const msalLib=await ensureMsalLoaded();
+  const client=new msalLib.PublicClientApplication({auth:{clientId:ssoConfig.clientId,authority:'https://login.microsoftonline.com/'+ssoConfig.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});
   if(client.initialize)await client.initialize();
   const auth=await client.loginPopup({scopes:['User.Read','Sites.Read.All'],prompt:'select_account'});
   const email=String(auth.account.username||'').toLowerCase();
