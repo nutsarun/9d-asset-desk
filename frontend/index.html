@@ -2612,9 +2612,9 @@ initiateMicrosoftLogin=async function(){
   window.nineMaster?.buildMenu();
   document.getElementById('nav-master')?.classList.toggle('hidden',!isAdmin);
   window.nineUpgradeAfterLogin?.();
-  const banner=document.createElement('div');banner.className='bg-amber-50 text-amber-900 border border-amber-200 rounded-xl p-3 mb-4 text-sm';
-  banner.textContent='เชื่อมต่อ Microsoft Graph สำเร็จ — โหลดทะเบียนทรัพย์สิน '+all.length+' รายการจาก SharePoint จริง (ข้อมูลพนักงานและการเบิก-คืนต้องได้รับ Sites.ReadWrite.All และสิทธิ์แก้ไข SharePoint; เอกสารธุรกรรมยังเก็บชั่วคราวในเบราว์เซอร์';
-  document.querySelector('main')?.prepend(banner);
+  // Connection status is informational, not a persistent page banner.
+  // Reuse the existing auto-dismiss toast (3.5 seconds) instead.
+  showToast('เชื่อมต่อ SharePoint สำเร็จ · โหลดทรัพย์สิน '+all.length+' รายการ','success');
  }catch(err){showToast('Microsoft / SharePoint: '+(err?.message||err),'error');}
 };
 </script>
