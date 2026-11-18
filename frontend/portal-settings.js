@@ -151,7 +151,7 @@ async function loadUsers(){
   }
   const self=email(currentUser?.email);
   const configured=users.find(u=>u.email===self);
-  if(!isRoot()&&onlyAllowlisted&&(!configured||!configured.enabled)){
+  if(!isRoot()&&((configured&&!configured.enabled)||(onlyAllowlisted&&!configured))){
    currentUser=null;showLoginScreen();showToast('บัญชี Microsoft นี้ยังไม่ได้รับสิทธิ์ใช้งานเว็บ กรุณาติดต่อ Super Admin','error');
    return;
   }
@@ -160,6 +160,8 @@ async function loadUsers(){
    currentUser.role=r==='staff'?'support':r==='auditor'?'viewer':r==='admin'?'admin':'viewer';
    currentUser.roleLabel=roles[r];
    applyUserProfileAndRBAC();
+   renderAll();
+   window.renderEmployees?.();
    updateMenus();
    renderUsers();
   }
