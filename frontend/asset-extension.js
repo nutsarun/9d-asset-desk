@@ -231,7 +231,9 @@ window.nineSaveAsset=async function(ev){
  fields[list.kind==='computer'?'Assetorserialnumber':'AssetorserialNumber']=document.getElementById('asset-serial').value.trim();
  fields[list.kind==='computer'?'Company':'Owner']=list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
  try{
-  if(hostname){if(await hasAssetColumn(list.id,'HostName'))fields.HostName=hostname;else throw Error('SharePoint List นี้ยังไม่มีคอลัมน์ HostName กรุณาเพิ่มคอลัมน์ Single line of text ชื่อ HostName');}
+  const hostSupported=await hasAssetColumn(list.id,'HostName');
+  if(hostname && !hostSupported)throw Error('SharePoint List นี้ยังไม่มีคอลัมน์ HostName กรุณาเพิ่มคอลัมน์ Single line of text ชื่อ HostName');
+  if(hostSupported)fields.HostName=hostname||fields.Title;
   if(a){
    if(a._sp.kind!==list.kind)throw Error('ไม่สามารถย้ายรายการข้าม List กรุณาสร้างรายการใหม่');
    if(a.status==='assigned')throw Error('ห้ามแก้ข้อมูลทรัพย์สินขณะมีผู้ถือครอง');
@@ -239,6 +241,7 @@ window.nineSaveAsset=async function(ev){
   }else{
    const allIds=await liveAssetIds();
    fields.Title=nextAssetId(company,cat,allIds);
+   if(hostSupported)fields.HostName=fields.Title;
    if(allIds.some(x=>String(x).toLowerCase()===fields.Title.toLowerCase()))throw Error('Asset ID ซ้ำ');
    await graph(path(list.id),'POST',{fields},true);
   }
