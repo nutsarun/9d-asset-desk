@@ -1,10 +1,2606 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<title>9D Asset Desk</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบริหารจัดการทรัพย์สินไอที | IT Asset Management</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MSAL.js (Microsoft Authentication Library for Browser) -->
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <!-- Google Fonts: Sarabun & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Sarabun', 'Inter', 'sans-serif'],
+                        mono: ['Inter', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Sarabun', 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* A4 Document Preview Styling */
+        .a4-paper {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 16mm 18mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            color: #1e293b;
+            box-sizing: border-box;
+        }
+
+        /* Print Media Query - ซ่อน UI อื่นทั้งหมดและจัดหน้ากระดาษ A4 ให้สมบูรณ์ */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            #login-screen, #ms-oauth-modal, #app-shell, #toast-container, .no-print {
+                display: none !important;
+            }
+            #print-modal {
+                position: static !important;
+                display: block !important;
+                background: transparent !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                inset: auto !important;
+            }
+            #print-modal-wrapper {
+                box-shadow: none !important;
+                max-width: none !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+            .a4-paper {
+                width: 100% !important;
+                min-height: auto !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 15mm 18mm !important;
+                page-break-after: auto;
+            }
+        }
+    </style>
 </head>
-<body><div id="gate"></div><div id="asset-app" hidden></div><script type="module" src="/main.js"></script></body>
+<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- ==================== ENTERPRISE SSO LOGIN SCREEN ==================== -->
+    <div id="login-screen" class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 flex items-center justify-center p-4 sm:p-6">
+        <div class="max-w-5xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 border border-slate-200/20">
+            
+            <!-- Left Panel: Enterprise Branding & Security Info -->
+            <div class="lg:col-span-6 bg-slate-900 text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute -right-16 -top-16 w-64 h-64 bg-brand-600/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="relative z-10">
+                    <div class="inline-flex items-center gap-3 bg-slate-800/80 border border-slate-700/80 px-3.5 py-2 rounded-2xl mb-8">
+                        <div class="bg-brand-600 p-2 rounded-xl">
+                            <i data-lucide="shield-check" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <div>
+                            <span class="font-bold text-sm tracking-wide block">IT Asset Pro Enterprise</span>
+                            <span class="text-[11px] text-slate-400">Single Sign-On (Microsoft Entra ID)</span>
+                        </div>
+                    </div>
+
+                    <h1 class="text-2xl sm:text-3xl font-bold leading-snug tracking-tight">
+                        ระบบบริหารจัดการทรัพย์สินและอุปกรณ์ไอทีองค์กร
+                    </h1>
+                    <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+                        ควบคุมการเบิก-ยืม รับคืน และออกเอกสารรับมอบทรัพย์สินอย่างเป็นระบบ ปลอดภัยด้วยมาตรฐานการยืนยันตัวตนผ่านบัญชี Microsoft 365 / Entra ID ขององค์กร
+                    </p>
+
+                    <div class="mt-8 space-y-3.5">
+                        <div class="flex items-start gap-3">
+                            <div class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg mt-0.5">
+                                <i data-lucide="key-round" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-200">Microsoft Entra ID (Azure AD) SSO</h3>
+                                <p class="text-xs text-slate-400">ล็อกอินด้วยอีเมลองค์กร ไม่ต้องจำรหัสผ่านใหม่ พร้อมจำกัดโดเมนอัตโนมัติ</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="p-1.5 bg-brand-500/10 text-brand-400 rounded-lg mt-0.5">
+                                <i data-lucide="user-cog" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-200">Role-Based Access Control (RBAC)</h3>
+                                <p class="text-xs text-slate-400">แยกสิทธิ์การทำงานชัดเจนระหว่าง IT Admin, IT Support และ Auditor/HR</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg mt-0.5">
+                                <i data-lucide="file-signature" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-200">Audit Trail & เอกสาร A4 อัตโนมัติ</h3>
+                                <p class="text-xs text-slate-400">ระบุชื่อเจ้าหน้าที่ผู้ส่งมอบ/ตรวจรับคืนจากบัญชี Microsoft ลงใบรับมอบทันที</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative z-10 pt-8 mt-8 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <span>© 2026 Enterprise IT Operations</span>
+                    <span id="login-sso-mode-badge" class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                        Mode: Sandbox / MSAL Ready
+                    </span>
+                </div>
+            </div>
+
+            <!-- Right Panel: Sign-in Actions -->
+            <div class="lg:col-span-6 p-8 sm:p-10 flex flex-col justify-center bg-white">
+                <div class="max-w-md w-full mx-auto space-y-6">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Authentication Required</span>
+                        <h2 class="text-2xl font-bold text-slate-900 mt-1">เข้าสู่ระบบใช้งาน</h2>
+                        <p class="text-sm text-slate-500 mt-1">กรุณาลงชื่อเข้าใช้ด้วยบัญชี Microsoft ขององค์กรเพื่อเข้าถึงฐานข้อมูลทรัพย์สิน</p>
+                    </div>
+
+                    <!-- Primary Microsoft Sign-In Button -->
+                    <div class="space-y-3">
+                        <button onclick="initiateMicrosoftLogin()" class="w-full py-3.5 px-5 bg-[#2F2F2F] hover:bg-[#1a1a1a] active:scale-[0.99] text-white font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-3 cursor-pointer">
+                            <!-- Official 4-square Microsoft SVG Logo -->
+                            <svg class="w-5 h-5 shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                            </svg>
+                            <span>Sign in with Microsoft</span>
+                        </button>
+                        <p class="text-[11px] text-center text-slate-400">
+                            รองรับบัญชี Microsoft 365 Work or School Account (<span id="login-allowed-domain-hint" class="font-mono text-slate-600">@company.co.th</span>)
+                        </p>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+                        <div class="relative flex justify-center text-xs">
+                            <span class="px-3 bg-white text-slate-400 font-medium">หรือทดสอบเข้าใช้งานด่วน (Demo Quick Login)</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Demo Role Buttons -->
+                    <div class="space-y-2.5">
+                        <button onclick="quickDemoLogin('admin')" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/40 transition-all flex items-center justify-between text-left group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">AD</div>
+                                <div>
+                                    <div class="text-sm font-bold text-slate-800 group-hover:text-brand-700">สมชาย วงศ์บริหาร <span class="text-xs font-normal text-slate-400">(admin@company.co.th)</span></div>
+                                    <div class="text-xs text-slate-500">สิทธิ์สูงสุด: เพิ่ม/ลบอุปกรณ์, เบิก-คืน, ตั้งค่า Azure SSO</div>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 text-[11px] font-bold rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">IT Admin</span>
+                        </button>
+
+                        <button onclick="quickDemoLogin('support')" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/40 transition-all flex items-center justify-between text-left group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-xs">IT</div>
+                                <div>
+                                    <div class="text-sm font-bold text-slate-800 group-hover:text-brand-700">ณัฐพล ไอทีซัพพอร์ต <span class="text-xs font-normal text-slate-400">(staff.it@company.co.th)</span></div>
+                                    <div class="text-xs text-slate-500">สิทธิ์ปฏิบัติการ: เบิก-คืนอุปกรณ์, พิมพ์เอกสาร, แก้ไขข้อมูล</div>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">IT Support</span>
+                        </button>
+
+                        <button onclick="quickDemoLogin('viewer')" class="w-full p-3 rounded-xl border border-slate-200 hover:border-brand-500 hover:bg-brand-50/40 transition-all flex items-center justify-between text-left group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 font-bold flex items-center justify-center text-xs">HR</div>
+                                <div>
+                                    <div class="text-sm font-bold text-slate-800 group-hover:text-brand-700">กัญญา ฝ่ายบุคคล <span class="text-xs font-normal text-slate-400">(viewer@company.co.th)</span></div>
+                                    <div class="text-xs text-slate-500">สิทธิ์ดูอย่างเดียว: ดู Dashboard, รายการทรัพย์สิน, พิมพ์เอกสาร</div>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-50 text-amber-700 border border-amber-200">Auditor / HR</span>
+                        </button>
+                    </div>
+
+                    <!-- Guide Link -->
+                    <div class="pt-2 text-center">
+                        <button onclick="openSsoSetupModal(true)" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors">
+                            <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+                            <span>ตั้งค่า Client ID / Tenant ID จริง (Azure Portal Guide)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SIMULATED MICROSOFT ENTRA ID OAUTH MODAL ==================== -->
+    <div id="ms-oauth-modal" class="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-[440px] w-full p-8 sm:p-10 relative border border-slate-200">
+            <button onclick="closeMsOauthModal()" class="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Microsoft Header -->
+            <div class="flex items-center gap-2.5 mb-6">
+                <svg class="w-6 h-6" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                <span class="text-lg font-semibold text-slate-700 tracking-tight">Microsoft</span>
+            </div>
+
+            <!-- Step 1: Account Picker -->
+            <div id="ms-oauth-step-picker" class="space-y-4">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-900">เลือกบัญชี (Pick an account)</h3>
+                    <p class="text-xs text-slate-500 mt-1">จำลองหน้าจอ Microsoft Entra ID OAuth 2.0 สำหรับเลือกบัญชีองค์กร</p>
+                </div>
+
+                <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    <button onclick="selectSimulatedMsAccount('admin')" class="w-full p-3.5 hover:bg-slate-50 flex items-center gap-3.5 text-left transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shrink-0">สว</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-semibold text-slate-900 truncate">สมชาย วงศ์บริหาร (IT Manager)</div>
+                            <div class="text-xs text-slate-500 font-mono truncate">admin@company.co.th</div>
+                            <div class="text-[11px] text-indigo-600 font-medium mt-0.5">Signed in • Role: IT Admin</div>
+                        </div>
+                    </button>
+
+                    <button onclick="selectSimulatedMsAccount('support')" class="w-full p-3.5 hover:bg-slate-50 flex items-center gap-3.5 text-left transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shrink-0">ณอ</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-semibold text-slate-900 truncate">ณัฐพล ไอทีซัพพอร์ต (IT Support)</div>
+                            <div class="text-xs text-slate-500 font-mono truncate">staff.it@company.co.th</div>
+                            <div class="text-[11px] text-emerald-600 font-medium mt-0.5">Signed in • Role: IT Support</div>
+                        </div>
+                    </button>
+
+                    <button onclick="selectSimulatedMsAccount('viewer')" class="w-full p-3.5 hover:bg-slate-50 flex items-center gap-3.5 text-left transition-colors">
+                        <div class="w-10 h-10 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center text-sm shrink-0">กฝ</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-semibold text-slate-900 truncate">กัญญา ฝ่ายบุคคล (HR & Audit)</div>
+                            <div class="text-xs text-slate-500 font-mono truncate">viewer@company.co.th</div>
+                            <div class="text-[11px] text-amber-600 font-medium mt-0.5">Signed in • Role: Viewer (Read-Only)</div>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Custom Microsoft Email Input -->
+                <form onsubmit="submitCustomMsEmail(event)" class="pt-2 space-y-2.5">
+                    <label class="block text-xs font-semibold text-slate-600">หรือลงชื่อเข้าใช้ด้วยอีเมล Microsoft อื่นขององค์กร:</label>
+                    <div class="flex gap-2">
+                        <input type="email" id="ms-custom-email" required placeholder="your.name@company.co.th" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#0067b8]">
+                        <button type="submit" class="px-4 py-2 bg-[#0067b8] hover:bg-[#005da6] text-white text-sm font-semibold rounded-lg transition-colors">ถัดไป</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Step 2: Authenticating Spinner -->
+            <div id="ms-oauth-step-loading" class="hidden py-10 text-center space-y-4">
+                <div class="w-10 h-10 border-4 border-slate-200 border-t-[#0067b8] rounded-full animate-spin mx-auto"></div>
+                <div>
+                    <h4 class="font-bold text-slate-800">กำลังยืนยันตัวตนกับ Microsoft Entra ID...</h4>
+                    <p id="ms-oauth-loading-email" class="text-xs text-slate-500 font-mono mt-1">กำลังตรวจสอบ Token และสิทธิ์ RBAC</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Shell (Hidden until Authenticated) -->
+    <div id="app-shell" class="min-h-screen hidden flex-col lg:flex-row">
+        
+        <!-- Mobile Header -->
+        <header class="lg:hidden bg-slate-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
+            <div class="flex items-center gap-2.5">
+                <div class="bg-brand-600 p-2 rounded-lg">
+                    <i data-lucide="laptop" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base leading-tight">IT Asset Pro</h1>
+                    <p class="text-[11px] text-slate-400">Microsoft Entra ID SSO</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="mobile-user-avatar" class="w-8 h-8 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">IT</div>
+                <button onclick="toggleMobileSidebar()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-68 bg-slate-900 text-slate-300 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-auto transition-transform duration-200 ease-in-out flex flex-col justify-between shadow-xl">
+            <div>
+                <!-- Brand Logo -->
+                <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gradient-to-br from-brand-500 to-brand-700 p-2.5 rounded-xl shadow-lg shadow-brand-500/20">
+                            <i data-lucide="server" class="w-6 h-6 text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-lg text-white tracking-tight">IT Asset Pro</h1>
+                            <p class="text-xs text-slate-400">ระบบจัดการอุปกรณ์องค์กร</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleMobileSidebar()" class="lg:hidden text-slate-400 hover:text-white">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="p-4 space-y-1.5">
+                    <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-brand-600 text-white shadow-md shadow-brand-600/20">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                        <span>ภาพรวมระบบ (Dashboard)</span>
+                    </button>
+                    <button onclick="switchTab('inventory')" data-tab="inventory" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="hard-drive" class="w-5 h-5"></i>
+                        <span>คลังทรัพย์สิน (Inventory)</span>
+                    </button>
+                    <button id="nav-checkout" onclick="switchTab('checkout')" data-tab="checkout" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="user-plus" class="w-5 h-5"></i>
+                        <span>เบิก-ยืมอุปกรณ์ (Check-Out)</span>
+                    </button>
+                    <button id="nav-checkin" onclick="switchTab('checkin')" data-tab="checkin" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="corner-down-left" class="w-5 h-5"></i>
+                        <span>รับคืนอุปกรณ์ (Check-In)</span>
+                    </button>
+                    <button onclick="switchTab('history')" data-tab="history" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                        <span>ประวัติ & พิมพ์เอกสาร</span>
+                    </button>
+                    <button id="nav-sso-settings" onclick="openSsoSetupModal(false)" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+                        <i data-lucide="shield-check" class="w-5 h-5 text-sky-400"></i>
+                        <span>ตั้งค่า Microsoft SSO</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- User Profile Card & Sign Out -->
+            <div class="p-4 border-t border-slate-800 space-y-3">
+                <div class="bg-slate-800/90 border border-slate-700/70 rounded-2xl p-3.5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div id="sidebar-user-avatar" class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-sm">
+                            AD
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div id="sidebar-user-name" class="text-sm font-bold text-white truncate">สมชาย วงศ์บริหาร</div>
+                            <div id="sidebar-user-email" class="text-[11px] text-slate-400 font-mono truncate">admin@company.co.th</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-700/70">
+                        <span id="sidebar-user-role-badge" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            IT Admin
+                        </span>
+                        <span class="text-[10px] text-emerald-400 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            Entra SSO
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-reset-demo" onclick="confirmResetData()" class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 border border-slate-800 transition-all" title="รีเซ็ตข้อมูลตัวอย่าง">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>รีเซ็ตข้อมูล</span>
+                    </button>
+                    <button onclick="signOutUser()" class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                        <span>ออกจากระบบ</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sidebar Backdrop for Mobile -->
+        <div id="sidebar-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 hidden lg:hidden"></div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-x-hidden">
+            
+            <!-- Top User & Role Status Banner -->
+            <div class="mb-6 bg-white rounded-2xl border border-slate-200/80 shadow-2xs px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5 text-xs text-slate-600">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                    </svg>
+                    <span>เข้าสู่ระบบโดย: <strong id="topbar-user-name" class="text-slate-900">-</strong> (<span id="topbar-user-email" class="font-mono text-slate-500">-</span>)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="topbar-role-desc" class="text-xs text-slate-500 hidden sm:inline">สิทธิ์การเข้าถึง:</span>
+                    <span id="topbar-role-badge" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">IT Admin</span>
+                </div>
+            </div>
+
+            <!-- ==================== TAB 1: DASHBOARD ==================== -->
+            <section id="tab-dashboard" class="tab-content space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">ภาพรวมทรัพย์สินไอทีในองค์กร</h2>
+                        <p class="text-sm text-slate-500 mt-0.5">สรุปสถานะอุปกรณ์ทั้งหมด ผู้ถือครองปัจจุบัน และรายการเคลื่อนไหวล่าสุด</p>
+                    </div>
+                    <div id="dashboard-quick-actions" class="flex flex-wrap gap-2">
+                        <button onclick="switchTab('checkout')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl shadow-sm transition-all">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            <span>ทำรายการเบิก-ยืม</span>
+                        </button>
+                        <button onclick="switchTab('checkin')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-medium rounded-xl shadow-xs transition-all">
+                            <i data-lucide="arrow-down-left" class="w-4 h-4 text-emerald-600"></i>
+                            <span>รับคืนอุปกรณ์</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary KPI Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="dashboard-kpis">
+                    <!-- Rendered via JS -->
+                </div>
+
+                <!-- Category Breakdown & Recent Transactions -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Category Breakdown -->
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-brand-600"></i>
+                                <span>สัดส่วนตามหมวดหมู่</span>
+                            </h3>
+                        </div>
+                        <div id="category-stats" class="space-y-3.5">
+                            <!-- Rendered via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="history" class="w-4 h-4 text-brand-600"></i>
+                                <span>ประวัติการเบิก-คืนล่าสุด</span>
+                            </h3>
+                            <button onclick="switchTab('history')" class="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                                <span>ดูทั้งหมด</span>
+                                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto flex-1">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="py-2.5 px-3">เลขที่เอกสาร</th>
+                                        <th class="py-2.5 px-3">ประเภท</th>
+                                        <th class="py-2.5 px-3">พนักงาน</th>
+                                        <th class="py-2.5 px-3">จำนวน</th>
+                                        <th class="py-2.5 px-3">วันที่</th>
+                                        <th class="py-2.5 px-3 text-right">เอกสาร</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-recent-tx" class="divide-y divide-slate-100 text-sm">
+                                    <!-- Rendered via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Holders Summary -->
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="users" class="w-4 h-4 text-brand-600"></i>
+                            <span>พนักงานที่กำลังถือครองอุปกรณ์อยู่ในขณะนี้</span>
+                        </h3>
+                        <span id="active-holders-count" class="text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">0 คน</span>
+                    </div>
+                    <div id="dashboard-active-holders" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Rendered via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 2: ASSET INVENTORY ==================== -->
+            <section id="tab-inventory" class="tab-content hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">คลังฐานข้อมูลทรัพย์สินไอที</h2>
+                        <p class="text-sm text-slate-500 mt-0.5">จัดการทะเบียนคอมพิวเตอร์ โน๊ตบุ๊ค จอภาพ และอุปกรณ์ต่อพ่วงทั้งหมด</p>
+                    </div>
+                    <button id="btn-add-asset" onclick="openAssetModal()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl shadow-sm transition-all">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>เพิ่มอุปกรณ์ใหม่</span>
+                    </button>
+                </div>
+
+                <!-- Filters & Search -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="sm:col-span-2 relative">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="inv-search" oninput="renderInventory()" placeholder="ค้นหา Asset ID, ยี่ห้อ, รุ่น, Serial Number, หรือชื่อผู้ใช้งาน..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
+                    </div>
+                    <div>
+                        <select id="inv-filter-category" onchange="renderInventory()" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
+                            <option value="ALL">ทุกหมวดหมู่ (All Categories)</option>
+                            <option value="Notebook">Notebook (โน๊ตบุ๊ค)</option>
+                            <option value="Monitor">Monitor (จอภาพ)</option>
+                            <option value="Smartphone">Smartphone / Tablet</option>
+                            <option value="Accessory">Accessory (อุปกรณ์เสริม)</option>
+                            <option value="Network">Network (อุปกรณ์เครือข่าย)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="inv-filter-status" onchange="renderInventory()" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500">
+                            <option value="ALL">ทุกสถานะ (All Statuses)</option>
+                            <option value="available">พร้อมใช้งาน (Available)</option>
+                            <option value="assigned">ถูกยืมใช้งาน (Assigned)</option>
+                            <option value="repair">ส่งซ่อม (In Repair)</option>
+                            <option value="retired">ปลดระวาง (Retired)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Inventory Table -->
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Asset ID</th>
+                                    <th class="py-3.5 px-4">หมวดหมู่</th>
+                                    <th class="py-3.5 px-4">ยี่ห้อ / รุ่น / สเปก</th>
+                                    <th class="py-3.5 px-4">Serial Number</th>
+                                    <th class="py-3.5 px-4">สถานะ</th>
+                                    <th class="py-3.5 px-4">ผู้ถือครอง / วันที่รับ</th>
+                                    <th class="py-3.5 px-4 text-right">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-tbody" class="divide-y divide-slate-100 text-sm">
+                                <!-- Rendered via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 3: CHECK-OUT (ASSIGNMENT) ==================== -->
+            <section id="tab-checkout" class="tab-content hidden space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">เบิก-ยืมอุปกรณ์ไอที (Check-Out)</h2>
+                    <p class="text-sm text-slate-500 mt-0.5">เลือกพนักงานและหยิบอุปกรณ์ที่พร้อมใช้งานลงรายการเบิกได้หลายชิ้นในครั้งเดียว พร้อมออกใบรับมอบทันที</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Left Column: Available Assets Picker (7 cols) -->
+                    <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 flex flex-col">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center">1</span>
+                                <span>เลือกอุปกรณ์ที่พร้อมใช้งาน</span>
+                            </h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="co-search" oninput="renderCheckoutAvailable()" placeholder="ค้นหา Asset ID, รุ่น, S/N..." class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand-500 w-44 sm:w-52">
+                                <select id="co-cat-filter" onchange="renderCheckoutAvailable()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand-500">
+                                    <option value="ALL">ทุกหมวด</option>
+                                    <option value="Notebook">Notebook</option>
+                                    <option value="Monitor">Monitor</option>
+                                    <option value="Smartphone">Smartphone</option>
+                                    <option value="Accessory">Accessory</option>
+                                    <option value="Network">Network</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="co-available-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[540px] overflow-y-auto pr-1">
+                            <!-- Rendered via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Employee Info & Cart (5 cols) -->
+                    <div class="lg:col-span-5 space-y-5">
+                        <form id="checkout-form" onsubmit="submitCheckout(event)" class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+                                <span class="w-6 h-6 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center">2</span>
+                                <span>ข้อมูลผู้เบิกและรายการที่เลือก</span>
+                            </h3>
+
+                            <!-- Quick Select Existing Employee -->
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">ดึงข้อมูลพนักงานเดิม (หรือกรอกใหม่ด้านล่าง)</label>
+                                <select id="co-preset-emp" onchange="fillEmployeePreset(this.value)" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-brand-500">
+                                    <option value="">-- เลือกพนักงานจากรายชื่อในระบบ --</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">รหัสพนักงาน <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="co-emp-id" required placeholder="เช่น EMP-001" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="co-emp-name" required placeholder="เช่น สมชาย ใจดี" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">แผนก / ฝ่าย <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="co-emp-dept" required placeholder="เช่น การตลาด, บัญชี" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">ตำแหน่ง</label>
+                                    <input type="text" id="co-emp-pos" placeholder="เช่น Senior Officer" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">เบอร์โทร / อีเมลติดต่อ</label>
+                                <input type="text" id="co-emp-contact" placeholder="เช่น 081-234-5678 / somchai@company.co.th" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่รับอุปกรณ์ <span class="text-rose-500">*</span></label>
+                                    <input type="date" id="co-date" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">กำหนดคืน (ถ้ามี)</label>
+                                    <input type="date" id="co-due-date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">สภาพอุปกรณ์ / หมายเหตุการส่งมอบ</label>
+                                <input type="text" id="co-note" value="สภาพสมบูรณ์ 100% พร้อมสายชาร์จและอุปกรณ์มาตรฐาน" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                            </div>
+
+                            <!-- Selected Cart Items -->
+                            <div class="pt-2">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-slate-700 uppercase">รายการอุปกรณ์ที่เลือก (<span id="co-cart-count" class="text-brand-600">0</span> ชิ้น)</span>
+                                    <button type="button" onclick="clearCheckoutCart()" class="text-xs text-rose-500 hover:underline">ล้างรายการ</button>
+                                </div>
+                                <div id="co-cart-list" class="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 min-h-[80px]">
+                                    <!-- Rendered via JS -->
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md shadow-brand-600/20 flex items-center justify-center gap-2 transition-all">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                                <span>บันทึกการเบิก & ออกใบรับมอบ</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== TAB 4: CHECK-IN (RETURN) ==================== -->
+            <section id="tab-checkin" class="tab-content hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">รับคืนอุปกรณ์ไอที (Check-In)</h2>
+                        <p class="text-sm text-slate-500 mt-0.5">เลือกพนักงานที่ต้องการส่งคืนอุปกรณ์ สามารถติ๊กคืนบางรายการ หรือคืนทั้งหมดพร้อมออกใบตรวจรับคืนได้ทันที</p>
+                    </div>
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="ci-search" oninput="renderCheckinList()" placeholder="ค้นหาชื่อพนักงาน, รหัส, Asset ID..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <div id="checkin-employees-container" class="space-y-5">
+                    <!-- Rendered via JS -->
+                </div>
+            </section>
+
+            <!-- ==================== TAB 5: TRANSACTION HISTORY & DOCUMENTS ==================== -->
+            <section id="tab-history" class="tab-content hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">ประวัติธุรกรรมและเอกสารรับมอบ/ส่งคืน</h2>
+                        <p class="text-sm text-slate-500 mt-0.5">ตรวจสอบประวัติการเบิก-คืนย้อนหลัง และสั่งพิมพ์เอกสาร A4 ได้ทุกเมื่อ</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="hist-filter-type" onchange="renderHistory()" class="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-500">
+                            <option value="ALL">ทุกประเภทเอกสาร</option>
+                            <option value="CHECKOUT">ใบรับมอบอุปกรณ์ (Check-Out)</option>
+                            <option value="CHECKIN">ใบตรวจรับคืนอุปกรณ์ (Check-In)</option>
+                        </select>
+                        <input type="text" id="hist-search" oninput="renderHistory()" placeholder="ค้นหาเลขที่เอกสาร, ชื่อพนักงาน..." class="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 w-48 sm:w-64">
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
+                                    <th class="py-3.5 px-4">เลขที่เอกสาร</th>
+                                    <th class="py-3.5 px-4">ประเภทธุรกรรม</th>
+                                    <th class="py-3.5 px-4">วันที่ทำรายการ</th>
+                                    <th class="py-3.5 px-4">พนักงาน (รหัส / แผนก)</th>
+                                    <th class="py-3.5 px-4">รายการอุปกรณ์ & ผู้ดำเนินการ</th>
+                                    <th class="py-3.5 px-4 text-right">พิมพ์เอกสาร</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody" class="divide-y divide-slate-100 text-sm">
+                                <!-- Rendered via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ==================== MODAL: MICROSOFT ENTRA ID (AZURE AD) SSO SETTINGS ==================== -->
+    <div id="sso-setup-modal" class="fixed inset-0 z-[70] bg-slate-900/70 backdrop-blur-xs hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 sm:p-8 space-y-6 my-8">
+            <div class="flex items-start justify-between border-b border-slate-100 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-sky-50 text-sky-600 rounded-xl border border-sky-200">
+                        <i data-lucide="shield-check" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">ตั้งค่า Microsoft Entra ID (Azure AD) Single Sign-On</h3>
+                        <p class="text-xs text-slate-500">เชื่อมต่อระบบยืนยันตัวตนองค์กรจริงผ่าน MSAL.js 2.0 และกำหนดเงื่อนไขโดเมน</p>
+                    </div>
+                </div>
+                <button onclick="closeSsoSetupModal()" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="sso-config-form" onsubmit="saveSsoConfig(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Application (Client) ID</label>
+                        <input type="text" id="sso-client-id" placeholder="เช่น 11112222-3333-4444-5555-666677778888" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:border-brand-500">
+                        <p class="text-[11px] text-slate-400 mt-1">เว้นว่างไว้หากต้องการใช้โหมดจำลอง (Sandbox Mode)</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Directory (Tenant) ID</label>
+                        <input type="text" id="sso-tenant-id" placeholder="เช่น common หรือ Tenant UUID ขององค์กร" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:border-brand-500">
+                        <p class="text-[11px] text-slate-400 mt-1">แนะนำให้ใส่ Tenant ID ขององค์กรเพื่อจำกัดเฉพาะผู้ใช้ภายใน</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Allowed Organization Domain</label>
+                        <input type="text" id="sso-allowed-domain" placeholder="เช่น @company.co.th" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:border-brand-500">
+                        <p class="text-[11px] text-slate-400 mt-1">อนุญาตเฉพาะอีเมลที่ลงท้ายด้วยโดเมนนี้ (เว้นว่างเพื่อรับทุกโดเมน)</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Redirect URI (สำหรับลงทะเบียนใน Azure)</label>
+                        <input type="text" id="sso-redirect-uri" readonly class="w-full px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-600">
+                        <p class="text-[11px] text-slate-400 mt-1">คัดลอก URL นี้ไปใส่ใน Azure App Registration (SPA)</p>
+                    </div>
+                </div>
+
+                <!-- Azure Portal Setup Guide Box -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5 text-xs text-slate-700">
+                    <h4 class="font-bold text-slate-900 flex items-center gap-1.5">
+                        <i data-lucide="book-open" class="w-4 h-4 text-brand-600"></i>
+                        <span>ขั้นตอนการตั้งค่าใน Microsoft Azure Portal (Entra ID):</span>
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-600 leading-relaxed">
+                        <li>เข้าสู่ <strong>portal.azure.com</strong> &gt; ไปที่เมนู <strong>Microsoft Entra ID</strong> &gt; <strong>App registrations</strong> &gt; คลิก <strong>New registration</strong></li>
+                        <li>ตั้งชื่อแอป เช่น <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200">IT Asset Pro</code> และเลือก <strong>Single tenant (Accounts in this organizational directory only)</strong></li>
+                        <li>ในหัวข้อ <strong>Redirect URI</strong> ให้เลือกแพลตฟอร์มเป็น <strong>Single-page application (SPA)</strong> และวาง URL ด้านบน</li>
+                        <li>คัดลอกค่า <strong>Application (client) ID</strong> และ <strong>Directory (tenant) ID</strong> มาวางในช่องด้านบนแล้วกดบันทึก</li>
+                    </ol>
+                    <details class="pt-1">
+                        <summary class="cursor-pointer font-semibold text-brand-600 hover:underline">ดูตัวอย่างโค้ด MSAL.js Configuration ที่ระบบใช้งาน</summary>
+                        <pre class="mt-2 p-3 bg-slate-900 text-emerald-300 rounded-xl overflow-x-auto font-mono text-[11px] leading-relaxed">const msalConfig = {
+  auth: {
+    clientId: "YOUR_CLIENT_ID",
+    authority: "https://login.microsoftonline.com/YOUR_TENANT_ID",
+    redirectUri: window.location.origin + window.location.pathname
+  }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });</pre>
+                    </details>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeSsoSetupModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">ปิดหน้าต่าง</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm">บันทึกการตั้งค่า SSO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: ADD / EDIT ASSET ==================== -->
+    <div id="asset-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 my-8 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 id="asset-modal-title" class="text-lg font-bold text-slate-900">เพิ่มข้อมูลทรัพย์สินใหม่</h3>
+                <button onclick="closeAssetModal()" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="asset-form" onsubmit="saveAsset(event)" class="space-y-4">
+                <input type="hidden" id="asset-edit-mode" value="add">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเลขอุปกรณ์ (Asset ID) <span class="text-rose-500">*</span></label>
+                        <input type="text" id="asset-id" required placeholder="เช่น IT-NB-005" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมวดหมู่ <span class="text-rose-500">*</span></label>
+                        <select id="asset-category" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                            <option value="Notebook">Notebook (โน๊ตบุ๊ค)</option>
+                            <option value="Monitor">Monitor (จอภาพ)</option>
+                            <option value="Smartphone">Smartphone / Tablet</option>
+                            <option value="Accessory">Accessory (อุปกรณ์เสริม)</option>
+                            <option value="Network">Network (เครือข่าย)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">ยี่ห้อ (Brand) <span class="text-rose-500">*</span></label>
+                        <input type="text" id="asset-brand" required placeholder="เช่น Apple, Dell, Lenovo" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รุ่น / โมเดล (Model) <span class="text-rose-500">*</span></label>
+                        <input type="text" id="asset-model" required placeholder="เช่น MacBook Pro 14 M3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">เลขซีเรียล (Serial Number) <span class="text-rose-500">*</span></label>
+                        <input type="text" id="asset-serial" required placeholder="เช่น SN-99887766" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่จัดซื้อ</label>
+                        <input type="date" id="asset-purchase-date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">สเปก / รายละเอียดเพิ่มเติม</label>
+                    <input type="text" id="asset-specs" placeholder="เช่น RAM 16GB / SSD 512GB / สี Space Gray" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                </div>
+                <div id="asset-status-group">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">สถานะอุปกรณ์</label>
+                    <select id="asset-status" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                        <option value="available">พร้อมใช้งาน (Available)</option>
+                        <option value="repair">ส่งซ่อม (In Repair)</option>
+                        <option value="retired">ปลดระวาง (Retired)</option>
+                    </select>
+                    <p id="asset-assigned-hint" class="text-xs text-amber-600 mt-1 hidden">* อุปกรณ์นี้กำลังถูกยืมใช้งานอยู่ หากต้องการเปลี่ยนเป็นพร้อมใช้งาน กรุณาทำรายการรับคืนในเมนู Check-In</p>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeAssetModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: CONFIRMATION DIALOG ==================== -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center gap-3 text-rose-600">
+                <div class="p-2.5 bg-rose-50 rounded-xl">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <h3 id="confirm-title" class="text-lg font-bold text-slate-900">ยืนยันการทำรายการ</h3>
+            </div>
+            <p id="confirm-message" class="text-sm text-slate-600 leading-relaxed"></p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+                <button id="confirm-yes-btn" class="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-xl">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: PRINTABLE A4 DOCUMENT ==================== -->
+    <div id="print-modal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs hidden overflow-y-auto p-4 sm:p-6">
+        <div id="print-modal-wrapper" class="max-w-4xl mx-auto">
+            <!-- Toolbar (Hidden on Print) -->
+            <div class="no-print bg-slate-800 text-white px-5 py-3.5 rounded-t-2xl flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10 shadow-lg">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="printer" class="w-5 h-5 text-brand-400"></i>
+                    <span class="font-semibold text-sm">ตัวอย่างเอกสารพร้อมพิมพ์ (ขนาดมาตรฐาน A4)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl shadow-sm transition-all">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        <span>สั่งพิมพ์เอกสาร / บันทึกเป็น PDF</span>
+                    </button>
+                    <button onclick="closePrintModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-xl transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                        <span>ปิดหน้าต่าง</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Printable A4 Paper Container -->
+            <div class="bg-slate-200/80 p-0 sm:p-6 rounded-b-2xl overflow-x-auto">
+                <div id="a4-document-content" class="a4-paper">
+                    <!-- Rendered dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== APPLICATION LOGIC ==================== -->
+    <script>
+        // --- 1. INITIAL MOCK DATA & STATE MANAGEMENT ---
+        const STORAGE_KEYS = {
+            ASSETS: 'it_asset_pro_assets_v1',
+            TRANSACTIONS: 'it_asset_pro_tx_v1',
+            AUTH_USER: 'it_asset_pro_auth_user_v1',
+            SSO_CONFIG: 'it_asset_pro_sso_config_v1'
+        };
+
+        const DEFAULT_SSO_CONFIG = {
+            clientId: '',
+            tenantId: 'common',
+            allowedDomain: '@company.co.th'
+        };
+
+        const DEMO_ACCOUNTS = {
+            admin: {
+                name: 'สมชาย วงศ์บริหาร',
+                email: 'admin@company.co.th',
+                role: 'admin',
+                roleLabel: 'IT Admin',
+                department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT Manager)',
+                initials: 'สว'
+            },
+            support: {
+                name: 'ณัฐพล ไอทีซัพพอร์ต',
+                email: 'staff.it@company.co.th',
+                role: 'support',
+                roleLabel: 'IT Support',
+                department: 'ฝ่ายเทคโนโลยีสารสนเทศ (IT Support)',
+                initials: 'ณอ'
+            },
+            viewer: {
+                name: 'กัญญา ฝ่ายบุคคล',
+                email: 'viewer@company.co.th',
+                role: 'viewer',
+                roleLabel: 'Auditor / HR',
+                department: 'ฝ่ายทรัพยากรบุคคลและตรวจสอบ',
+                initials: 'กฝ'
+            }
+        };
+
+        const DEFAULT_ASSETS = [
+            {
+                id: 'IT-NB-001',
+                category: 'Notebook',
+                brand: 'Apple',
+                model: 'MacBook Pro 14" (M3 Pro)',
+                serial: 'C02Z9182MD6R',
+                specs: 'Chip M3 Pro / RAM 18GB / SSD 512GB / Space Black',
+                purchaseDate: '2025-01-15',
+                status: 'assigned',
+                assignedTo: {
+                    empId: 'EMP-1024',
+                    name: 'ธนากร ศิริวัฒน์',
+                    department: 'Product & Engineering',
+                    position: 'Senior UX/UI Designer',
+                    contact: '089-456-1122 / thanakorn@company.co.th',
+                    assignedDate: '2025-02-01',
+                    dueDate: ''
+                }
+            },
+            {
+                id: 'IT-MN-001',
+                category: 'Monitor',
+                brand: 'Dell',
+                model: 'UltraSharp U2723QE 27" 4K',
+                serial: 'CN-08H92K-74261',
+                specs: '27-inch 4K IPS Black USB-C Hub Monitor',
+                purchaseDate: '2025-01-15',
+                status: 'assigned',
+                assignedTo: {
+                    empId: 'EMP-1024',
+                    name: 'ธนากร ศิริวัฒน์',
+                    department: 'Product & Engineering',
+                    position: 'Senior UX/UI Designer',
+                    contact: '089-456-1122 / thanakorn@company.co.th',
+                    assignedDate: '2025-02-01',
+                    dueDate: ''
+                }
+            },
+            {
+                id: 'IT-AC-001',
+                category: 'Accessory',
+                brand: 'Logitech',
+                model: 'MX Master 3S Wireless',
+                serial: '2410LZ098812',
+                specs: 'Graphite Silent Click Wireless Mouse',
+                purchaseDate: '2025-01-20',
+                status: 'assigned',
+                assignedTo: {
+                    empId: 'EMP-1024',
+                    name: 'ธนากร ศิริวัฒน์',
+                    department: 'Product & Engineering',
+                    position: 'Senior UX/UI Designer',
+                    contact: '089-456-1122 / thanakorn@company.co.th',
+                    assignedDate: '2025-02-01',
+                    dueDate: ''
+                }
+            },
+            {
+                id: 'IT-NB-002',
+                category: 'Notebook',
+                brand: 'Lenovo',
+                model: 'ThinkPad X1 Carbon Gen 11',
+                serial: 'PF-4A98B12',
+                specs: 'Intel Core i7-1365U / RAM 16GB / SSD 512GB / Win11 Pro',
+                purchaseDate: '2025-03-10',
+                status: 'assigned',
+                assignedTo: {
+                    empId: 'EMP-1058',
+                    name: 'ปิยะนุช วงศ์สุวรรณ',
+                    department: 'การเงินและบัญชี (Finance)',
+                    position: 'Accounting Manager',
+                    contact: '081-778-9900 / piyanuch@company.co.th',
+                    assignedDate: '2025-03-15',
+                    dueDate: ''
+                }
+            },
+            {
+                id: 'IT-NB-003',
+                category: 'Notebook',
+                brand: 'Dell',
+                model: 'Latitude 5440',
+                serial: '8H29KL3',
+                specs: 'Intel Core i5-1345U / RAM 16GB / SSD 512GB',
+                purchaseDate: '2025-05-05',
+                status: 'available',
+                assignedTo: null
+            },
+            {
+                id: 'IT-NB-004',
+                category: 'Notebook',
+                brand: 'Apple',
+                model: 'MacBook Air 13" (M2)',
+                serial: 'FVFJ8291Q6L4',
+                specs: 'Chip M2 / RAM 16GB / SSD 256GB / Midnight',
+                purchaseDate: '2025-06-12',
+                status: 'available',
+                assignedTo: null
+            },
+            {
+                id: 'IT-MN-002',
+                category: 'Monitor',
+                brand: 'LG',
+                model: '27UP850N-W 27" UHD 4K',
+                serial: '309NTBK88210',
+                specs: '27" IPS 4K USB-C 90W Power Delivery',
+                purchaseDate: '2025-05-05',
+                status: 'available',
+                assignedTo: null
+            },
+            {
+                id: 'IT-SP-001',
+                category: 'Smartphone',
+                brand: 'Apple',
+                model: 'iPad Air 11" (M2) Wi-Fi + Cellular',
+                serial: 'DMPK99120X',
+                specs: '256GB / Blue / พร้อม Apple Pencil Pro',
+                purchaseDate: '2025-07-01',
+                status: 'available',
+                assignedTo: null
+            },
+            {
+                id: 'IT-AC-002',
+                category: 'Accessory',
+                brand: 'Keychron',
+                model: 'K3 Pro Mechanical Keyboard',
+                serial: 'KC-K3P-99210',
+                specs: 'Low Profile Red Switch / Thai-Eng Keycaps',
+                purchaseDate: '2025-05-10',
+                status: 'available',
+                assignedTo: null
+            },
+            {
+                id: 'IT-NW-001',
+                category: 'Network',
+                brand: 'TP-Link',
+                model: 'M7650 600Mbps LTE-Advanced Mobile Wi-Fi',
+                serial: '22389019283',
+                specs: 'Pocket Wi-Fi สำหรับออกบูธและงานนอกสถานที่',
+                purchaseDate: '2024-11-20',
+                status: 'repair',
+                assignedTo: null
+            }
+        ];
+
+        const DEFAULT_TRANSACTIONS = [
+            {
+                docNo: 'HO-20250201-001',
+                type: 'CHECKOUT',
+                date: '2025-02-01',
+                dueDate: '',
+                employee: {
+                    empId: 'EMP-1024',
+                    name: 'ธนากร ศิริวัฒน์',
+                    department: 'Product & Engineering',
+                    position: 'Senior UX/UI Designer',
+                    contact: '089-456-1122 / thanakorn@company.co.th'
+                },
+                items: [
+                    { id: 'IT-NB-001', category: 'Notebook', brand: 'Apple', model: 'MacBook Pro 14" (M3 Pro)', serial: 'C02Z9182MD6R', condition: 'สภาพใหม่ 100% พร้อมสายชาร์จ MagSafe' },
+                    { id: 'IT-MN-001', category: 'Monitor', brand: 'Dell', model: 'UltraSharp U2723QE 27" 4K', serial: 'CN-08H92K-74261', condition: 'สภาพใหม่ 100% พร้อมสาย USB-C และสายไฟ' },
+                    { id: 'IT-AC-001', category: 'Accessory', brand: 'Logitech', model: 'MX Master 3S Wireless', serial: '2410LZ098812', condition: 'สภาพใหม่ 100% พร้อมตัวรับสัญญาณ Logi Bolt' }
+                ],
+                note: 'เบิกอุปกรณ์ชุดทำงานประจำตำแหน่ง Designer',
+                officerName: 'เจ้าหน้าที่ฝ่ายไอที (IT Support)'
+            },
+            {
+                docNo: 'HO-20250315-002',
+                type: 'CHECKOUT',
+                date: '2025-03-15',
+                dueDate: '',
+                employee: {
+                    empId: 'EMP-1058',
+                    name: 'ปิยะนุช วงศ์สุวรรณ',
+                    department: 'การเงินและบัญชี (Finance)',
+                    position: 'Accounting Manager',
+                    contact: '081-778-9900 / piyanuch@company.co.th'
+                },
+                items: [
+                    { id: 'IT-NB-002', category: 'Notebook', brand: 'Lenovo', model: 'ThinkPad X1 Carbon Gen 11', serial: 'PF-4A98B12', condition: 'สภาพสมบูรณ์ 100% พร้อมกระเป๋าและสายชาร์จ' }
+                ],
+                note: 'เครื่องทดแทนเครื่องเดิมที่ครบอายุการใช้งาน',
+                officerName: 'เจ้าหน้าที่ฝ่ายไอที (IT Support)'
+            }
+        ];
+
+        let assets = [];
+        let transactions = [];
+        let checkoutCart = []; // Array of asset IDs
+        let currentUser = null;
+        let ssoConfig = { ...DEFAULT_SSO_CONFIG };
+
+        // --- 2. INITIALIZATION, AUTHENTICATION & STORAGE ---
+        function initApp() {
+            const savedAssets = localStorage.getItem(STORAGE_KEYS.ASSETS);
+            const savedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+            const savedSso = localStorage.getItem(STORAGE_KEYS.SSO_CONFIG);
+            const savedUser = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
+
+            if (savedAssets && savedTx) {
+                assets = JSON.parse(savedAssets);
+                transactions = JSON.parse(savedTx);
+            } else {
+                assets = JSON.parse(JSON.stringify(DEFAULT_ASSETS));
+                transactions = JSON.parse(JSON.stringify(DEFAULT_TRANSACTIONS));
+                saveToStorage();
+            }
+
+            if (savedSso) {
+                ssoConfig = { ...DEFAULT_SSO_CONFIG, ...JSON.parse(savedSso) };
+            }
+            updateLoginScreenSsoHints();
+
+            // Set today's date as default on checkout form
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('co-date').value = today;
+
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showAuthenticatedApp();
+            } else {
+                showLoginScreen();
+            }
+
+            lucide.createIcons();
+        }
+
+        function updateLoginScreenSsoHints() {
+            const domainHint = document.getElementById('login-allowed-domain-hint');
+            const modeBadge = document.getElementById('login-sso-mode-badge');
+            if (domainHint) {
+                domainHint.textContent = ssoConfig.allowedDomain ? ssoConfig.allowedDomain : 'All Microsoft Accounts';
+            }
+            if (modeBadge) {
+                modeBadge.textContent = ssoConfig.clientId
+                    ? `MSAL Live: ${ssoConfig.clientId.slice(0, 8)}...`
+                    : 'Mode: Sandbox / MSAL Ready';
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('login-screen').classList.add('flex');
+            document.getElementById('app-shell').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('flex');
+            lucide.createIcons();
+        }
+
+        function showAuthenticatedApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('flex');
+            document.getElementById('app-shell').classList.remove('hidden');
+            document.getElementById('app-shell').classList.add('flex');
+
+            applyUserProfileAndRBAC();
+            renderAll();
+        }
+
+        function applyUserProfileAndRBAC() {
+            if (!currentUser) return;
+
+            // Update Profile UI
+            document.getElementById('sidebar-user-avatar').textContent = currentUser.initials || 'MS';
+            document.getElementById('mobile-user-avatar').textContent = currentUser.initials || 'MS';
+            document.getElementById('sidebar-user-name').textContent = currentUser.name;
+            document.getElementById('sidebar-user-email').textContent = currentUser.email;
+            document.getElementById('topbar-user-name').textContent = currentUser.name;
+            document.getElementById('topbar-user-email').textContent = currentUser.email;
+
+            const roleStyles = {
+                admin: {
+                    sidebar: 'px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
+                    topbar: 'px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200',
+                    desc: 'สิทธิ์สูงสุด (จัดการคลัง, เบิก-คืน, ตั้งค่า SSO)'
+                },
+                support: {
+                    sidebar: 'px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+                    topbar: 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200',
+                    desc: 'สิทธิ์ปฏิบัติการ (เบิก-คืนอุปกรณ์, แก้ไขข้อมูล, พิมพ์เอกสาร)'
+                },
+                viewer: {
+                    sidebar: 'px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                    topbar: 'px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200',
+                    desc: 'สิทธิ์ดูอย่างเดียว (Read-Only: ตรวจสอบข้อมูลและพิมพ์เอกสาร)'
+                }
+            };
+
+            const style = roleStyles[currentUser.role] || roleStyles.support;
+            const sbBadge = document.getElementById('sidebar-user-role-badge');
+            const tbBadge = document.getElementById('topbar-role-badge');
+            sbBadge.className = style.sidebar;
+            sbBadge.textContent = currentUser.roleLabel;
+            tbBadge.className = style.topbar;
+            tbBadge.textContent = `${currentUser.roleLabel} — ${style.desc}`;
+
+            // Enforce RBAC Visibility
+            const isViewer = currentUser.role === 'viewer';
+            const isAdmin = currentUser.role === 'admin';
+
+            document.getElementById('nav-checkout').classList.toggle('hidden', isViewer);
+            document.getElementById('nav-checkin').classList.toggle('hidden', isViewer);
+            document.getElementById('dashboard-quick-actions').classList.toggle('hidden', isViewer);
+            document.getElementById('btn-add-asset').classList.toggle('hidden', isViewer);
+            document.getElementById('nav-sso-settings').classList.toggle('hidden', !isAdmin);
+            document.getElementById('btn-reset-demo').classList.toggle('hidden', !isAdmin);
+        }
+
+        async function initiateMicrosoftLogin() {
+            // If real Client ID is configured and MSAL is loaded, attempt real Microsoft Entra ID Popup Login
+            if (ssoConfig.clientId && typeof msal !== 'undefined') {
+                try {
+                    const msalConfig = {
+                        auth: {
+                            clientId: ssoConfig.clientId,
+                            authority: `https://login.microsoftonline.com/${ssoConfig.tenantId || 'common'}`,
+                            redirectUri: window.location.origin + window.location.pathname
+                        }
+                    };
+                    const msalInstance = new msal.PublicClientApplication(msalConfig);
+                    if (typeof msalInstance.initialize === 'function') {
+                        await msalInstance.initialize();
+                    }
+                    const response = await msalInstance.loginPopup({ scopes: ['User.Read'] });
+                    const account = response.account;
+                    completeMicrosoftSignIn({
+                        name: account.name || account.username,
+                        email: account.username,
+                        role: 'admin',
+                        roleLabel: 'IT Admin (Microsoft SSO)',
+                        department: 'Microsoft Entra ID User',
+                        initials: (account.name || account.username).substring(0, 2).toUpperCase()
+                    });
+                    return;
+                } catch (err) {
+                    showToast(`การเชื่อมต่อ MSAL พบข้อผิดพลาด (${err.message || 'เปิดโหมดจำลองแทน'})`, 'error');
+                }
+            }
+
+            // Open Simulated Microsoft Entra ID OAuth2 Account Picker Modal
+            document.getElementById('ms-oauth-step-picker').classList.remove('hidden');
+            document.getElementById('ms-oauth-step-loading').classList.add('hidden');
+            const modal = document.getElementById('ms-oauth-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeMsOauthModal() {
+            const modal = document.getElementById('ms-oauth-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function selectSimulatedMsAccount(roleKey) {
+            const acc = DEMO_ACCOUNTS[roleKey];
+            if (!acc) return;
+            runSimulatedOAuthFlow(acc);
+        }
+
+        function submitCustomMsEmail(e) {
+            e.preventDefault();
+            const email = document.getElementById('ms-custom-email').value.trim().toLowerCase();
+            if (!email) return;
+
+            // Check Allowed Domain policy
+            if (ssoConfig.allowedDomain && !email.endsWith(ssoConfig.allowedDomain.toLowerCase())) {
+                showToast(`ปฏิเสธการเข้าถึง: อนุญาตเฉพาะบัญชีองค์กร (${ssoConfig.allowedDomain}) เท่านั้น`, 'error');
+                return;
+            }
+
+            // Determine role automatically by email prefix
+            let role = 'support';
+            let roleLabel = 'IT Support';
+            if (email.startsWith('admin')) {
+                role = 'admin';
+                roleLabel = 'IT Admin';
+            } else if (email.startsWith('viewer') || email.startsWith('hr') || email.startsWith('audit')) {
+                role = 'viewer';
+                roleLabel = 'Auditor / HR';
+            }
+
+            const localName = email.split('@')[0].replace(/[._]/g, ' ');
+            const displayName = localName.replace(/\b\w/g, l => l.toUpperCase());
+
+            runSimulatedOAuthFlow({
+                name: displayName,
+                email: email,
+                role: role,
+                roleLabel: roleLabel,
+                department: 'Microsoft 365 Organization User',
+                initials: displayName.substring(0, 2).toUpperCase()
+            });
+        }
+
+        function runSimulatedOAuthFlow(userObj) {
+            // Check Allowed Domain policy even on demo accounts if customized
+            if (ssoConfig.allowedDomain && !userObj.email.toLowerCase().endsWith(ssoConfig.allowedDomain.toLowerCase())) {
+                showToast(`บัญชี ${userObj.email} ไม่อยู่ในโดเมนที่อนุญาต (${ssoConfig.allowedDomain})`, 'error');
+                return;
+            }
+
+            document.getElementById('ms-oauth-step-picker').classList.add('hidden');
+            document.getElementById('ms-oauth-step-loading').classList.remove('hidden');
+            document.getElementById('ms-oauth-loading-email').textContent = `กำลังตรวจสอบ Token สำหรับ ${userObj.email}...`;
+
+            setTimeout(() => {
+                closeMsOauthModal();
+                completeMicrosoftSignIn(userObj);
+            }, 650);
+        }
+
+        function quickDemoLogin(roleKey) {
+            const acc = DEMO_ACCOUNTS[roleKey];
+            if (!acc) return;
+            completeMicrosoftSignIn(acc);
+        }
+
+        function completeMicrosoftSignIn(userObj) {
+            currentUser = userObj;
+            localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(currentUser));
+            switchTab('dashboard');
+            showAuthenticatedApp();
+            showToast(`ยินดีต้อนรับ ${currentUser.name} (${currentUser.roleLabel})`, 'success');
+        }
+
+        function signOutUser() {
+            openConfirmModal(
+                'ยืนยันการออกจากระบบ (Sign Out)',
+                `คุณต้องการออกจากระบบบัญชี ${currentUser ? currentUser.email : ''} ใช่หรือไม่?`,
+                () => {
+                    currentUser = null;
+                    checkoutCart = [];
+                    localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+                    showLoginScreen();
+                    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+                }
+            );
+        }
+
+        // --- SSO SETTINGS MODAL ---
+        function openSsoSetupModal(fromLogin = false) {
+            document.getElementById('sso-client-id').value = ssoConfig.clientId || '';
+            document.getElementById('sso-tenant-id').value = ssoConfig.tenantId || 'common';
+            document.getElementById('sso-allowed-domain').value = ssoConfig.allowedDomain || '';
+            document.getElementById('sso-redirect-uri').value = window.location.origin + window.location.pathname;
+
+            const modal = document.getElementById('sso-setup-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeSsoSetupModal() {
+            const modal = document.getElementById('sso-setup-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveSsoConfig(e) {
+            e.preventDefault();
+            ssoConfig = {
+                clientId: document.getElementById('sso-client-id').value.trim(),
+                tenantId: document.getElementById('sso-tenant-id').value.trim() || 'common',
+                allowedDomain: document.getElementById('sso-allowed-domain').value.trim()
+            };
+            localStorage.setItem(STORAGE_KEYS.SSO_CONFIG, JSON.stringify(ssoConfig));
+            updateLoginScreenSsoHints();
+            closeSsoSetupModal();
+            showToast('บันทึกการตั้งค่า Microsoft Entra ID SSO เรียบร้อยแล้ว', 'success');
+        }
+
+        function saveToStorage() {
+            localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
+            localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+        }
+
+        function confirmResetData() {
+            openConfirmModal(
+                'รีเซ็ตข้อมูลตัวอย่างเริ่มต้น',
+                'คุณต้องการล้างข้อมูลที่แก้ไขทั้งหมดและกลับไปใช้ข้อมูลตัวอย่างเริ่มต้นของระบบใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้',
+                () => {
+                    assets = JSON.parse(JSON.stringify(DEFAULT_ASSETS));
+                    transactions = JSON.parse(JSON.stringify(DEFAULT_TRANSACTIONS));
+                    checkoutCart = [];
+                    saveToStorage();
+                    renderAll();
+                    showToast('รีเซ็ตข้อมูลตัวอย่างเรียบร้อยแล้ว', 'success');
+                }
+            );
+        }
+
+        // --- 3. NAVIGATION & UI HELPERS ---
+        function switchTab(tabName) {
+            if (currentUser && currentUser.role === 'viewer' && (tabName === 'checkout' || tabName === 'checkin')) {
+                showToast('สิทธิ์ Auditor / HR ไม่สามารถทำรายการเบิก-คืนอุปกรณ์ได้', 'error');
+                return;
+            }
+
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.tab === tabName) {
+                    btn.className = 'nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-brand-600 text-white shadow-md shadow-brand-600/20';
+                } else {
+                    btn.className = 'nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-slate-800 hover:text-white text-slate-300';
+                }
+            });
+
+            // Close mobile sidebar if open
+            const sidebar = document.getElementById('sidebar');
+            if (!sidebar.classList.contains('-translate-x-full') && window.innerWidth < 1024) {
+                toggleMobileSidebar();
+            }
+
+            renderAll();
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-600 text-white border-emerald-500',
+                error: 'bg-rose-600 text-white border-rose-500',
+                info: 'bg-slate-800 text-white border-slate-700'
+            };
+            const icons = {
+                success: 'check-circle',
+                error: 'alert-circle',
+                info: 'info'
+            };
+            toast.className = `${colors[type]} border px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium pointer-events-auto transform transition-all duration-300 translate-y-0 opacity-100`;
+            toast.innerHTML = `
+                <i data-lucide="${icons[type]}" class="w-5 h-5 shrink-0"></i>
+                <span class="flex-1">${message}</span>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function formatThaiDate(dateStr) {
+            if (!dateStr) return '-';
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            const year = parseInt(parts[0]) + 543;
+            const month = months[parseInt(parts[1]) - 1];
+            const day = parseInt(parts[2]);
+            return `${day} ${month} ${year}`;
+        }
+
+        function getStatusBadge(status) {
+            const map = {
+                available: '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>พร้อมใช้งาน</span>',
+                assigned: '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>ถูกยืมใช้งาน</span>',
+                repair: '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>ส่งซ่อม</span>',
+                retired: '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>ปลดระวาง</span>'
+            };
+            return map[status] || status;
+        }
+
+        function getCategoryIcon(cat) {
+            const icons = {
+                Notebook: 'laptop',
+                Monitor: 'monitor',
+                Smartphone: 'smartphone',
+                Accessory: 'mouse',
+                Network: 'wifi'
+            };
+            return icons[cat] || 'box';
+        }
+
+        function renderAll() {
+            renderDashboard();
+            renderInventory();
+            renderCheckoutAvailable();
+            renderCheckoutCart();
+            populateEmployeePresets();
+            renderCheckinList();
+            renderHistory();
+            lucide.createIcons();
+        }
+
+        // --- 4. DASHBOARD RENDERING ---
+        function renderDashboard() {
+            const total = assets.length;
+            const available = assets.filter(a => a.status === 'available').length;
+            const assigned = assets.filter(a => a.status === 'assigned').length;
+            const repair = assets.filter(a => a.status === 'repair').length;
+
+            document.getElementById('dashboard-kpis').innerHTML = `
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">ทรัพย์สินทั้งหมด</p>
+                        <p class="text-3xl font-bold text-slate-900 mt-1">${total}</p>
+                        <p class="text-xs text-slate-400 mt-1">รายการในทะเบียน</p>
+                    </div>
+                    <div class="p-3.5 bg-brand-50 text-brand-600 rounded-2xl">
+                        <i data-lucide="layers" class="w-7 h-7"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">พร้อมใช้งาน (คลัง)</p>
+                        <p class="text-3xl font-bold text-emerald-600 mt-1">${available}</p>
+                        <p class="text-xs text-emerald-600/80 mt-1">พร้อมจ่ายให้พนักงาน</p>
+                    </div>
+                    <div class="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl">
+                        <i data-lucide="check-circle" class="w-7 h-7"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">ถูกเบิกใช้งานอยู่</p>
+                        <p class="text-3xl font-bold text-amber-600 mt-1">${assigned}</p>
+                        <p class="text-xs text-amber-600/80 mt-1">อยู่ในการดูแลของพนักงาน</p>
+                    </div>
+                    <div class="p-3.5 bg-amber-50 text-amber-600 rounded-2xl">
+                        <i data-lucide="user-check" class="w-7 h-7"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase">ส่งซ่อม / ชำรุด</p>
+                        <p class="text-3xl font-bold text-rose-600 mt-1">${repair}</p>
+                        <p class="text-xs text-rose-600/80 mt-1">อยู่ระหว่างดำเนินการซ่อม</p>
+                    </div>
+                    <div class="p-3.5 bg-rose-50 text-rose-600 rounded-2xl">
+                        <i data-lucide="wrench" class="w-7 h-7"></i>
+                    </div>
+                </div>
+            `;
+
+            // Category Breakdown
+            const categories = ['Notebook', 'Monitor', 'Smartphone', 'Accessory', 'Network'];
+            const catHtml = categories.map(cat => {
+                const count = assets.filter(a => a.category === cat).length;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return `
+                    <div>
+                        <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="font-medium text-slate-700 flex items-center gap-2">
+                                <i data-lucide="${getCategoryIcon(cat)}" class="w-4 h-4 text-slate-400"></i>
+                                ${cat}
+                            </span>
+                            <span class="font-semibold text-slate-900">${count} <span class="text-xs font-normal text-slate-400">(${pct}%)</span></span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div class="bg-brand-600 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('category-stats').innerHTML = catHtml;
+
+            // Recent Transactions
+            const recentTx = transactions.slice(0, 5);
+            const recentHtml = recentTx.length ? recentTx.map(tx => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="py-2.5 px-3 font-mono text-xs font-semibold text-slate-700">${tx.docNo}</td>
+                    <td class="py-2.5 px-3">
+                        ${tx.type === 'CHECKOUT' 
+                            ? '<span class="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-50 text-blue-700">เบิก-ยืม</span>' 
+                            : '<span class="px-2 py-0.5 text-xs font-semibold rounded-md bg-emerald-50 text-emerald-700">ส่งคืน</span>'}
+                    </td>
+                    <td class="py-2.5 px-3 font-medium text-slate-800">${tx.employee.name}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${tx.items.length} รายการ</td>
+                    <td class="py-2.5 px-3 text-xs text-slate-500">${formatThaiDate(tx.date)}</td>
+                    <td class="py-2.5 px-3 text-right">
+                        <button onclick="openPrintDocument('${tx.docNo}')" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span>พิมพ์</span>
+                        </button>
+                    </td>
+                </tr>
+            `).join('') : `<tr><td colspan="6" class="py-6 text-center text-slate-400">ยังไม่มีประวัติธุรกรรม</td></tr>`;
+            document.getElementById('dashboard-recent-tx').innerHTML = recentHtml;
+
+            // Active Holders
+            const holdersMap = groupAssignedAssetsByEmployee();
+            const holderKeys = Object.keys(holdersMap);
+            document.getElementById('active-holders-count').textContent = `${holderKeys.length} คน`;
+
+            const holdersHtml = holderKeys.length ? holderKeys.map(key => {
+                const group = holdersMap[key];
+                return `
+                    <div class="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all">
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                                <h4 class="font-bold text-slate-900">${group.employee.name}</h4>
+                                <p class="text-xs text-slate-500">${group.employee.empId} • ${group.employee.department}</p>
+                            </div>
+                            <span class="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs font-bold rounded-lg">${group.items.length} ชิ้น</span>
+                        </div>
+                        <ul class="space-y-1 mt-3 pt-2.5 border-t border-slate-200/70">
+                            ${group.items.map(item => `
+                                <li class="text-xs text-slate-600 flex items-center justify-between">
+                                    <span class="truncate pr-2"><strong class="font-mono text-slate-800">${item.id}</strong> ${item.brand} ${item.model}</span>
+                                    <span class="text-[11px] text-slate-400 shrink-0">${formatThaiDate(item.assignedTo.assignedDate)}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }).join('') : `<div class="col-span-full py-6 text-center text-sm text-slate-400">ขณะนี้ไม่มีพนักงานถือครองอุปกรณ์</div>`;
+            document.getElementById('dashboard-active-holders').innerHTML = holdersHtml;
+        }
+
+        // --- 5. INVENTORY MANAGEMENT ---
+        function renderInventory() {
+            const search = document.getElementById('inv-search').value.toLowerCase().trim();
+            const catFilter = document.getElementById('inv-filter-category').value;
+            const statusFilter = document.getElementById('inv-filter-status').value;
+
+            const filtered = assets.filter(a => {
+                const matchCat = catFilter === 'ALL' || a.category === catFilter;
+                const matchStatus = statusFilter === 'ALL' || a.status === statusFilter;
+                const holderName = a.assignedTo ? `${a.assignedTo.name} ${a.assignedTo.empId} ${a.assignedTo.department}` : '';
+                const haystack = `${a.id} ${a.brand} ${a.model} ${a.serial} ${a.specs} ${holderName}`.toLowerCase();
+                return matchCat && matchStatus && haystack.includes(search);
+            });
+
+            const tbody = document.getElementById('inventory-tbody');
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-10 text-center text-slate-400">ไม่พบข้อมูลทรัพย์สินที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(a => `
+                <tr class="hover:bg-slate-50/90 transition-colors">
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">${a.id}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            <i data-lucide="${getCategoryIcon(a.category)}" class="w-3.5 h-3.5 text-slate-500"></i>
+                            ${a.category}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="font-semibold text-slate-900">${a.brand} ${a.model}</div>
+                        <div class="text-xs text-slate-500 mt-0.5">${a.specs || '-'}</div>
+                    </td>
+                    <td class="py-3.5 px-4 font-mono text-xs text-slate-600 whitespace-nowrap">${a.serial}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">${getStatusBadge(a.status)}</td>
+                    <td class="py-3.5 px-4">
+                        ${a.assignedTo ? `
+                            <div class="text-sm font-semibold text-slate-800">${a.assignedTo.name}</div>
+                            <div class="text-xs text-slate-500">${a.assignedTo.department} • รับ ${formatThaiDate(a.assignedTo.assignedDate)}</div>
+                        ` : `<span class="text-xs text-slate-400">- ไม่มีผู้ถือครอง -</span>`}
+                    </td>
+                    <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                        ${currentUser && currentUser.role === 'viewer' ? `
+                            <span class="text-xs text-slate-400 italic">ดูอย่างเดียว</span>
+                        ` : `
+                            <div class="inline-flex items-center gap-1">
+                                <button onclick="openAssetModal('${a.id}')" title="แก้ไขข้อมูล" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                </button>
+                                ${a.status !== 'assigned' && currentUser && currentUser.role === 'admin' ? `
+                                    <button onclick="deleteAsset('${a.id}')" title="ลบรายการ (เฉพาะ IT Admin)" class="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `}
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function openAssetModal(assetId = null) {
+            const modal = document.getElementById('asset-modal');
+            const form = document.getElementById('asset-form');
+            form.reset();
+
+            if (assetId) {
+                const asset = assets.find(a => a.id === assetId);
+                if (!asset) return;
+                document.getElementById('asset-modal-title').textContent = `แก้ไขข้อมูลอุปกรณ์ (${asset.id})`;
+                document.getElementById('asset-edit-mode').value = asset.id;
+                document.getElementById('asset-id').value = asset.id;
+                document.getElementById('asset-id').readOnly = true;
+                document.getElementById('asset-id').classList.add('opacity-70', 'cursor-not-allowed');
+                document.getElementById('asset-category').value = asset.category;
+                document.getElementById('asset-brand').value = asset.brand;
+                document.getElementById('asset-model').value = asset.model;
+                document.getElementById('asset-serial').value = asset.serial;
+                document.getElementById('asset-purchase-date').value = asset.purchaseDate || '';
+                document.getElementById('asset-specs').value = asset.specs || '';
+
+                const statusSelect = document.getElementById('asset-status');
+                const hint = document.getElementById('asset-assigned-hint');
+                if (asset.status === 'assigned') {
+                    statusSelect.disabled = true;
+                    hint.classList.remove('hidden');
+                } else {
+                    statusSelect.disabled = false;
+                    statusSelect.value = asset.status;
+                    hint.classList.add('hidden');
+                }
+            } else {
+                document.getElementById('asset-modal-title').textContent = 'เพิ่มข้อมูลทรัพย์สินใหม่';
+                document.getElementById('asset-edit-mode').value = 'add';
+                document.getElementById('asset-id').readOnly = false;
+                document.getElementById('asset-id').classList.remove('opacity-70', 'cursor-not-allowed');
+                document.getElementById('asset-status').disabled = false;
+                document.getElementById('asset-status').value = 'available';
+                document.getElementById('asset-assigned-hint').classList.add('hidden');
+                document.getElementById('asset-purchase-date').value = new Date().toISOString().split('T')[0];
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAssetModal() {
+            const modal = document.getElementById('asset-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveAsset(e) {
+            e.preventDefault();
+            const mode = document.getElementById('asset-edit-mode').value;
+            const id = document.getElementById('asset-id').value.trim().toUpperCase();
+            const category = document.getElementById('asset-category').value;
+            const brand = document.getElementById('asset-brand').value.trim();
+            const model = document.getElementById('asset-model').value.trim();
+            const serial = document.getElementById('asset-serial').value.trim();
+            const purchaseDate = document.getElementById('asset-purchase-date').value;
+            const specs = document.getElementById('asset-specs').value.trim();
+            const status = document.getElementById('asset-status').value;
+
+            if (mode === 'add') {
+                if (assets.some(a => a.id.toLowerCase() === id.toLowerCase())) {
+                    showToast(`หมายเลข Asset ID "${id}" มีอยู่ในระบบแล้ว`, 'error');
+                    return;
+                }
+                assets.unshift({
+                    id, category, brand, model, serial, purchaseDate, specs,
+                    status: status,
+                    assignedTo: null
+                });
+                showToast(`เพิ่มอุปกรณ์ ${id} สำเร็จ`, 'success');
+            } else {
+                const idx = assets.findIndex(a => a.id === mode);
+                if (idx !== -1) {
+                    const current = assets[idx];
+                    assets[idx] = {
+                        ...current,
+                        category, brand, model, serial, purchaseDate, specs,
+                        status: current.status === 'assigned' ? 'assigned' : status
+                    };
+                    showToast(`อัปเดตข้อมูล ${id} เรียบร้อยแล้ว`, 'success');
+                }
+            }
+
+            saveToStorage();
+            closeAssetModal();
+            renderAll();
+        }
+
+        function deleteAsset(assetId) {
+            openConfirmModal(
+                'ยืนยันการลบข้อมูลอุปกรณ์',
+                `คุณต้องการลบอุปกรณ์หมายเลข ${assetId} ออกจากฐานข้อมูลใช่หรือไม่?`,
+                () => {
+                    assets = assets.filter(a => a.id !== assetId);
+                    checkoutCart = checkoutCart.filter(id => id !== assetId);
+                    saveToStorage();
+                    renderAll();
+                    showToast(`ลบอุปกรณ์ ${assetId} เรียบร้อยแล้ว`, 'info');
+                }
+            );
+        }
+
+        // --- 6. CHECK-OUT (ASSIGNMENT) WORKFLOW ---
+        function populateEmployeePresets() {
+            const select = document.getElementById('co-preset-emp');
+            const uniqueEmps = {};
+
+            // Collect from assigned assets and past transactions
+            assets.forEach(a => {
+                if (a.assignedTo) uniqueEmps[a.assignedTo.empId] = a.assignedTo;
+            });
+            transactions.forEach(tx => {
+                if (tx.employee) uniqueEmps[tx.employee.empId] = tx.employee;
+            });
+
+            const options = Object.values(uniqueEmps).map(emp => 
+                `<option value="${emp.empId}">${emp.empId} - ${emp.name} (${emp.department})</option>`
+            ).join('');
+            select.innerHTML = `<option value="">-- เลือกพนักงานจากรายชื่อในระบบ --</option>${options}`;
+        }
+
+        function fillEmployeePreset(empId) {
+            if (!empId) return;
+            let found = null;
+            for (const a of assets) {
+                if (a.assignedTo && a.assignedTo.empId === empId) { found = a.assignedTo; break; }
+            }
+            if (!found) {
+                for (const tx of transactions) {
+                    if (tx.employee && tx.employee.empId === empId) { found = tx.employee; break; }
+                }
+            }
+            if (found) {
+                document.getElementById('co-emp-id').value = found.empId || '';
+                document.getElementById('co-emp-name').value = found.name || '';
+                document.getElementById('co-emp-dept').value = found.department || '';
+                document.getElementById('co-emp-pos').value = found.position || '';
+                document.getElementById('co-emp-contact').value = found.contact || '';
+            }
+        }
+
+        function renderCheckoutAvailable() {
+            const search = document.getElementById('co-search').value.toLowerCase().trim();
+            const catFilter = document.getElementById('co-cat-filter').value;
+
+            const availableAssets = assets.filter(a => {
+                if (a.status !== 'available') return false;
+                const matchCat = catFilter === 'ALL' || a.category === catFilter;
+                const haystack = `${a.id} ${a.brand} ${a.model} ${a.serial} ${a.specs}`.toLowerCase();
+                return matchCat && haystack.includes(search);
+            });
+
+            const container = document.getElementById('co-available-list');
+            if (!availableAssets.length) {
+                container.innerHTML = `<div class="col-span-full py-12 text-center text-sm text-slate-400">ไม่มีอุปกรณ์ที่พร้อมใช้งานตามเงื่อนไขที่ค้นหา</div>`;
+                return;
+            }
+
+            container.innerHTML = availableAssets.map(a => {
+                const inCart = checkoutCart.includes(a.id);
+                return `
+                    <div onclick="toggleCartItem('${a.id}')" class="cursor-pointer p-3.5 rounded-xl border transition-all flex flex-col justify-between ${inCart ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-500/20' : 'border-slate-200 hover:border-brand-300 bg-white hover:shadow-xs'}">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-1.5">
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded-md ${inCart ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700'}">${a.id}</span>
+                                <span class="text-xs text-slate-500 flex items-center gap-1">
+                                    <i data-lucide="${getCategoryIcon(a.category)}" class="w-3.5 h-3.5"></i>
+                                    ${a.category}
+                                </span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-900 leading-snug">${a.brand} ${a.model}</h4>
+                            <p class="text-xs text-slate-500 font-mono mt-0.5">S/N: ${a.serial}</p>
+                            <p class="text-[11px] text-slate-400 mt-1 line-clamp-1">${a.specs || ''}</p>
+                        </div>
+                        <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs font-medium ${inCart ? 'text-brand-700' : 'text-slate-500'}">
+                                ${inCart ? 'เลือกในรายการแล้ว' : 'คลิกเพื่อเพิ่มลงรายการ'}
+                            </span>
+                            <div class="w-6 h-6 rounded-lg flex items-center justify-center ${inCart ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">
+                                <i data-lucide="${inCart ? 'check' : 'plus'}" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function toggleCartItem(assetId) {
+            if (checkoutCart.includes(assetId)) {
+                checkoutCart = checkoutCart.filter(id => id !== assetId);
+            } else {
+                checkoutCart.push(assetId);
+            }
+            renderCheckoutAvailable();
+            renderCheckoutCart();
+        }
+
+        function clearCheckoutCart() {
+            checkoutCart = [];
+            renderCheckoutAvailable();
+            renderCheckoutCart();
+        }
+
+        function renderCheckoutCart() {
+            document.getElementById('co-cart-count').textContent = checkoutCart.length;
+            const listEl = document.getElementById('co-cart-list');
+
+            if (!checkoutCart.length) {
+                listEl.innerHTML = `<div class="py-5 text-center text-xs text-slate-400">ยังไม่ได้เลือกอุปกรณ์ กรุณาคลิกเลือกอุปกรณ์จากฝั่งซ้าย</div>`;
+                return;
+            }
+
+            listEl.innerHTML = checkoutCart.map(id => {
+                const a = assets.find(item => item.id === id);
+                if (!a) return '';
+                return `
+                    <div class="flex items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-slate-800 truncate"><span class="font-mono text-brand-600">${a.id}</span> • ${a.brand} ${a.model}</div>
+                            <div class="text-[11px] text-slate-400 font-mono">S/N: ${a.serial}</div>
+                        </div>
+                        <button type="button" onclick="toggleCartItem('${a.id}')" class="p-1 text-slate-400 hover:text-rose-500 rounded">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function generateDocNumber(prefix) {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const seq = String(transactions.length + 1).padStart(3, '0');
+            return `${prefix}-${y}${m}${d}-${seq}`;
+        }
+
+        function submitCheckout(e) {
+            e.preventDefault();
+            if (checkoutCart.length === 0) {
+                showToast('กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการก่อนบันทึก', 'error');
+                return;
+            }
+
+            const empId = document.getElementById('co-emp-id').value.trim();
+            const name = document.getElementById('co-emp-name').value.trim();
+            const department = document.getElementById('co-emp-dept').value.trim();
+            const position = document.getElementById('co-emp-pos').value.trim();
+            const contact = document.getElementById('co-emp-contact').value.trim();
+            const date = document.getElementById('co-date').value;
+            const dueDate = document.getElementById('co-due-date').value;
+            const note = document.getElementById('co-note').value.trim();
+
+            const docNo = generateDocNumber('HO');
+            const selectedItems = [];
+
+            checkoutCart.forEach(assetId => {
+                const idx = assets.findIndex(a => a.id === assetId);
+                if (idx !== -1) {
+                    assets[idx].status = 'assigned';
+                    assets[idx].assignedTo = {
+                        empId, name, department, position, contact,
+                        assignedDate: date,
+                        dueDate: dueDate
+                    };
+                    selectedItems.push({
+                        id: assets[idx].id,
+                        category: assets[idx].category,
+                        brand: assets[idx].brand,
+                        model: assets[idx].model,
+                        serial: assets[idx].serial,
+                        condition: note || 'สภาพสมบูรณ์พร้อมใช้งาน'
+                    });
+                }
+            });
+
+            const officerDisplay = currentUser
+                ? `${currentUser.name} (${currentUser.email})`
+                : 'เจ้าหน้าที่ฝ่ายไอที (IT Support)';
+
+            const newTx = {
+                docNo,
+                type: 'CHECKOUT',
+                date,
+                dueDate,
+                employee: { empId, name, department, position, contact },
+                items: selectedItems,
+                note,
+                officerName: officerDisplay
+            };
+
+            transactions.unshift(newTx);
+            checkoutCart = [];
+            saveToStorage();
+            renderAll();
+
+            showToast(`บันทึกการเบิกสำเร็จ! เลขที่เอกสาร ${docNo}`, 'success');
+            openPrintDocument(docNo);
+        }
+
+        // --- 7. CHECK-IN (RETURN) WORKFLOW ---
+        function groupAssignedAssetsByEmployee() {
+            const groups = {};
+            assets.filter(a => a.status === 'assigned' && a.assignedTo).forEach(a => {
+                const key = `${a.assignedTo.empId}_${a.assignedTo.name}`;
+                if (!groups[key]) {
+                    groups[key] = {
+                        key,
+                        employee: a.assignedTo,
+                        items: []
+                    };
+                }
+                groups[key].items.push(a);
+            });
+            return groups;
+        }
+
+        function renderCheckinList() {
+            const search = document.getElementById('ci-search').value.toLowerCase().trim();
+            const groups = groupAssignedAssetsByEmployee();
+            const container = document.getElementById('checkin-employees-container');
+            const today = new Date().toISOString().split('T')[0];
+
+            const filteredGroups = Object.values(groups).filter(g => {
+                const empText = `${g.employee.empId} ${g.employee.name} ${g.employee.department}`.toLowerCase();
+                const itemsText = g.items.map(i => `${i.id} ${i.brand} ${i.model} ${i.serial}`).join(' ').toLowerCase();
+                return (empText + ' ' + itemsText).includes(search);
+            });
+
+            if (!filteredGroups.length) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center">
+                        <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="inbox" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800">ไม่พบรายการอุปกรณ์ที่กำลังถูกยืมใช้งาน</h3>
+                        <p class="text-sm text-slate-500 mt-1">อุปกรณ์ทั้งหมดถูกส่งคืนครบถ้วนแล้ว หรือไม่ตรงกับคำค้นหา</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = filteredGroups.map((g, gIdx) => `
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <div class="bg-slate-50/90 px-5 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 font-bold flex items-center justify-center text-sm">
+                                ${g.employee.name.charAt(0)}
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-base">${g.employee.name} <span class="text-xs font-mono font-normal text-slate-500">(${g.employee.empId})</span></h3>
+                                <p class="text-xs text-slate-500">${g.employee.department} ${g.employee.position ? `• ${g.employee.position}` : ''}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="toggleSelectAllReturn('ci-form-${gIdx}', true)" class="px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg">
+                                เลือกคืนทั้งหมด (${g.items.length} ชิ้น)
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="ci-form-${gIdx}" onsubmit="submitCheckin(event, '${g.key}')" class="p-5 space-y-4">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
+                                        <th class="py-2 px-3 w-10">คืน</th>
+                                        <th class="py-2 px-3">Asset ID</th>
+                                        <th class="py-2 px-3">รายละเอียดอุปกรณ์</th>
+                                        <th class="py-2 px-3">วันที่รับไป</th>
+                                        <th class="py-2 px-3">สภาพตอนส่งคืน</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-sm">
+                                    ${g.items.map(item => `
+                                        <tr class="hover:bg-slate-50/70">
+                                            <td class="py-3 px-3">
+                                                <input type="checkbox" name="return_asset" value="${item.id}" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                                            </td>
+                                            <td class="py-3 px-3 font-mono font-bold text-slate-800">${item.id}</td>
+                                            <td class="py-3 px-3">
+                                                <div class="font-medium text-slate-900">${item.brand} ${item.model}</div>
+                                                <div class="text-xs text-slate-400 font-mono">S/N: ${item.serial}</div>
+                                            </td>
+                                            <td class="py-3 px-3 text-xs text-slate-600">${formatThaiDate(item.assignedTo.assignedDate)}</td>
+                                            <td class="py-3 px-3">
+                                                <select name="condition_${item.id}" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand-500">
+                                                    <option value="normal">ปกติ / สมบูรณ์ (กลับเข้าคลังพร้อมใช้งาน)</option>
+                                                    <option value="incomplete">อุปกรณ์เสริมไม่ครบ (กลับเข้าคลังพร้อมใช้งาน)</option>
+                                                    <option value="damaged">ชำรุด / เสียหาย (ส่งซ่อมทันที)</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 items-end">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่รับคืนอุปกรณ์ <span class="text-rose-500">*</span></label>
+                                <input type="date" name="return_date" value="${today}" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุการตรวจรับคืน</label>
+                                <input type="text" name="return_note" placeholder="เช่น ตรวจสอบสภาพเรียบร้อย ครบถ้วน" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-brand-500">
+                            </div>
+                            <div>
+                                <button type="submit" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all">
+                                    <i data-lucide="check-square" class="w-4 h-4"></i>
+                                    <span>ยืนยันรับคืน & ออกใบตรวจรับคืน</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function toggleSelectAllReturn(formId, checked) {
+            const form = document.getElementById(formId);
+            form.querySelectorAll('input[name="return_asset"]').forEach(cb => cb.checked = checked);
+        }
+
+        function submitCheckin(e, groupKey) {
+            e.preventDefault();
+            const form = e.target;
+            const checkedBoxes = Array.from(form.querySelectorAll('input[name="return_asset"]:checked'));
+
+            if (checkedBoxes.length === 0) {
+                showToast('กรุณาติ๊กเลือกอุปกรณ์ที่ต้องการรับคืนอย่างน้อย 1 รายการ', 'error');
+                return;
+            }
+
+            const returnDate = form.querySelector('input[name="return_date"]').value;
+            const returnNote = form.querySelector('input[name="return_note"]').value.trim();
+            const groups = groupAssignedAssetsByEmployee();
+            const group = groups[groupKey];
+            if (!group) return;
+
+            const docNo = generateDocNumber('RT');
+            const returnedItems = [];
+
+            const conditionLabels = {
+                normal: 'สภาพปกติ สมบูรณ์ครบถ้วน',
+                incomplete: 'อุปกรณ์เสริมไม่ครบ (โปรดระบุในหมายเหตุ)',
+                damaged: 'ชำรุด/เสียหาย (ส่งฝ่ายซ่อมบำรุง)'
+            };
+
+            checkedBoxes.forEach(cb => {
+                const assetId = cb.value;
+                const condCode = form.querySelector(`select[name="condition_${assetId}"]`).value;
+                const idx = assets.findIndex(a => a.id === assetId);
+
+                if (idx !== -1) {
+                    returnedItems.push({
+                        id: assets[idx].id,
+                        category: assets[idx].category,
+                        brand: assets[idx].brand,
+                        model: assets[idx].model,
+                        serial: assets[idx].serial,
+                        condition: conditionLabels[condCode]
+                    });
+
+                    // Update asset status
+                    assets[idx].status = condCode === 'damaged' ? 'repair' : 'available';
+                    assets[idx].assignedTo = null;
+                }
+            });
+
+            const officerDisplay = currentUser
+                ? `${currentUser.name} (${currentUser.email})`
+                : 'เจ้าหน้าที่ฝ่ายไอที (IT Support)';
+
+            const newTx = {
+                docNo,
+                type: 'CHECKIN',
+                date: returnDate,
+                employee: { ...group.employee },
+                items: returnedItems,
+                note: returnNote || 'ตรวจรับคืนอุปกรณ์เรียบร้อย',
+                officerName: officerDisplay
+            };
+
+            transactions.unshift(newTx);
+            saveToStorage();
+            renderAll();
+
+            showToast(`รับคืนอุปกรณ์ ${returnedItems.length} รายการสำเร็จ! ออกเอกสาร ${docNo}`, 'success');
+            openPrintDocument(docNo);
+        }
+
+        // --- 8. HISTORY & PRINTABLE A4 DOCUMENT ---
+        function renderHistory() {
+            const typeFilter = document.getElementById('hist-filter-type').value;
+            const search = document.getElementById('hist-search').value.toLowerCase().trim();
+
+            const filtered = transactions.filter(tx => {
+                const matchType = typeFilter === 'ALL' || tx.type === typeFilter;
+                const itemsStr = tx.items.map(i => `${i.id} ${i.brand} ${i.model} ${i.serial}`).join(' ');
+                const haystack = `${tx.docNo} ${tx.employee.name} ${tx.employee.empId} ${tx.employee.department} ${itemsStr}`.toLowerCase();
+                return matchType && haystack.includes(search);
+            });
+
+            const tbody = document.getElementById('history-tbody');
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-400">ไม่พบประวัติธุรกรรมที่ค้นหา</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(tx => `
+                <tr class="hover:bg-slate-50/90">
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">${tx.docNo}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        ${tx.type === 'CHECKOUT' 
+                            ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">ใบรับมอบ (Check-Out)</span>' 
+                            : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">ใบตรวจรับคืน (Check-In)</span>'}
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">${formatThaiDate(tx.date)}</td>
+                    <td class="py-3.5 px-4">
+                        <div class="font-semibold text-slate-900">${tx.employee.name}</div>
+                        <div class="text-xs text-slate-500">${tx.employee.empId} • ${tx.employee.department}</div>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <div class="text-xs text-slate-700 font-medium">${tx.items.length} รายการ: <span class="font-normal text-slate-500">${tx.items.map(i => `${i.id} (${i.brand} ${i.model})`).join(', ')}</span></div>
+                        <div class="text-[11px] text-brand-600 mt-0.5">ผู้ดำเนินการ: ${tx.officerName || 'เจ้าหน้าที่ฝ่ายไอที'}</div>
+                    </td>
+                    <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                        <button onclick="openPrintDocument('${tx.docNo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-brand-600 text-white text-xs font-medium rounded-lg shadow-2xs transition-colors">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span>ดู / พิมพ์เอกสาร</span>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function openPrintDocument(docNo) {
+            const tx = transactions.find(t => t.docNo === docNo);
+            if (!tx) return;
+
+            const isCheckout = tx.type === 'CHECKOUT';
+            const titleTh = isCheckout 
+                ? 'ใบรับมอบทรัพย์สินและอุปกรณ์ไอที' 
+                : 'ใบตรวจรับคืนทรัพย์สินและอุปกรณ์ไอที';
+            const titleEn = isCheckout 
+                ? 'IT ASSET HANDOVER & ASSIGNMENT FORM' 
+                : 'IT ASSET RETURN & INSPECTION FORM';
+
+            const docHtml = `
+                <div class="flex flex-col justify-between h-full text-slate-900" style="font-family: 'Sarabun', sans-serif;">
+                    <div>
+                        <!-- Document Header -->
+                        <div class="flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-5">
+                            <div>
+                                <div class="text-xs font-bold tracking-widest text-slate-500 uppercase mb-1">ฝ่ายเทคโนโลยีสารสนเทศ (IT Department)</div>
+                                <h1 class="text-2xl font-bold text-slate-900">${titleTh}</h1>
+                                <p class="text-xs font-semibold text-slate-600 tracking-wide mt-0.5">${titleEn}</p>
+                            </div>
+                            <div class="text-right text-xs space-y-1 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div><span class="text-slate-500">เลขที่เอกสาร (Doc No.):</span> <strong class="font-mono text-sm text-slate-900">${tx.docNo}</strong></div>
+                                <div><span class="text-slate-500">วันที่ทำรายการ (Date):</span> <strong>${formatThaiDate(tx.date)}</strong></div>
+                                ${isCheckout && tx.dueDate ? `<div><span class="text-slate-500">กำหนดส่งคืน (Due Date):</span> <strong>${formatThaiDate(tx.dueDate)}</strong></div>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Employee Information Box -->
+                        <div class="mb-5">
+                            <h2 class="text-sm font-bold bg-slate-100 px-3 py-1.5 border-l-4 border-slate-800 mb-3">
+                                ส่วนที่ 1: ข้อมูลผู้${isCheckout ? 'เบิก-รับมอบ' : 'ส่งคืน'}อุปกรณ์ (Employee Information)
+                            </h2>
+                            <div class="grid grid-cols-2 gap-y-2.5 gap-x-6 px-3 text-sm">
+                                <div class="flex border-b border-dotted border-slate-300 pb-1">
+                                    <span class="w-32 text-slate-500 shrink-0">ชื่อ-นามสกุล:</span>
+                                    <span class="font-semibold text-slate-900">${tx.employee.name}</span>
+                                </div>
+                                <div class="flex border-b border-dotted border-slate-300 pb-1">
+                                    <span class="w-32 text-slate-500 shrink-0">รหัสพนักงาน:</span>
+                                    <span class="font-mono font-semibold text-slate-900">${tx.employee.empId}</span>
+                                </div>
+                                <div class="flex border-b border-dotted border-slate-300 pb-1">
+                                    <span class="w-32 text-slate-500 shrink-0">แผนก / ฝ่าย:</span>
+                                    <span class="font-semibold text-slate-900">${tx.employee.department}</span>
+                                </div>
+                                <div class="flex border-b border-dotted border-slate-300 pb-1">
+                                    <span class="w-32 text-slate-500 shrink-0">ตำแหน่ง:</span>
+                                    <span class="font-semibold text-slate-900">${tx.employee.position || '-'}</span>
+                                </div>
+                                <div class="col-span-2 flex border-b border-dotted border-slate-300 pb-1">
+                                    <span class="w-32 text-slate-500 shrink-0">ข้อมูลติดต่อ:</span>
+                                    <span class="text-slate-800">${tx.employee.contact || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Asset Items Table -->
+                        <div class="mb-5">
+                            <h2 class="text-sm font-bold bg-slate-100 px-3 py-1.5 border-l-4 border-slate-800 mb-3">
+                                ส่วนที่ 2: รายการทรัพย์สินและอุปกรณ์ไอที (Asset Details) — รวมทั้งสิ้น ${tx.items.length} รายการ
+                            </h2>
+                            <table class="w-full border-collapse border border-slate-400 text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-800 font-bold">
+                                        <th class="border border-slate-400 py-2 px-2 text-center w-10">ลำดับ</th>
+                                        <th class="border border-slate-400 py-2 px-2.5 text-left w-28">หมายเลขอุปกรณ์<br>(Asset ID)</th>
+                                        <th class="border border-slate-400 py-2 px-2.5 text-left w-24">ประเภท</th>
+                                        <th class="border border-slate-400 py-2 px-2.5 text-left">ยี่ห้อ / รุ่น (Brand & Model)</th>
+                                        <th class="border border-slate-400 py-2 px-2.5 text-left w-32">เลขซีเรียล<br>(Serial Number)</th>
+                                        <th class="border border-slate-400 py-2 px-2.5 text-left">สภาพอุปกรณ์ / หมายเหตุ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tx.items.map((item, idx) => `
+                                        <tr>
+                                            <td class="border border-slate-400 py-2 px-2 text-center">${idx + 1}</td>
+                                            <td class="border border-slate-400 py-2 px-2.5 font-mono font-bold">${item.id}</td>
+                                            <td class="border border-slate-400 py-2 px-2.5">${item.category}</td>
+                                            <td class="border border-slate-400 py-2 px-2.5 font-medium">${item.brand} ${item.model}</td>
+                                            <td class="border border-slate-400 py-2 px-2.5 font-mono">${item.serial}</td>
+                                            <td class="border border-slate-400 py-2 px-2.5">${item.condition || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                            ${tx.note ? `
+                                <div class="mt-2.5 text-xs bg-slate-50 p-2.5 rounded border border-slate-200">
+                                    <strong>หมายเหตุเพิ่มเติม:</strong> ${tx.note}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Terms & Conditions -->
+                        <div class="mb-8 text-xs text-slate-700 bg-slate-50/80 p-3.5 rounded-lg border border-slate-300 leading-relaxed">
+                            <h3 class="font-bold text-slate-900 mb-1">ข้อตกลงและเงื่อนไขการดูแลรักษาทรัพย์สินองค์กร:</h3>
+                            ${isCheckout ? `
+                                <ol class="list-decimal list-inside space-y-1">
+                                    <li>ข้าพเจ้าได้รับมอบอุปกรณ์ตามรายการข้างต้นในสภาพสมบูรณ์พร้อมใช้งาน และจะใช้เพื่อการปฏิบัติงานขององค์กรเท่านั้น</li>
+                                    <li>ข้าพเจ้าจะดูแลรักษาอุปกรณ์ไม่ให้เกิดความเสียหาย สูญหาย หรือติดตั้งซอฟต์แวร์ที่ละเมิดลิขสิทธิ์โดยเด็ดขาด</li>
+                                    <li>หากอุปกรณ์เกิดการชำรุด ขัดข้อง หรือสูญหาย ข้าพเจ้าจะแจ้งให้ฝ่ายเทคโนโลยีสารสนเทศ (IT) ทราบทันที</li>
+                                    <li>เมื่อพ้นสภาพการเป็นพนักงาน หรือมีการโอนย้ายตำแหน่ง ข้าพเจ้าจะส่งคืนอุปกรณ์ทั้งหมดในสภาพเรียบร้อยแก่ฝ่ายไอที</li>
+                                </ol>
+                            ` : `
+                                <ol class="list-decimal list-inside space-y-1">
+                                    <li>ผู้ส่งคืนได้ส่งมอบทรัพย์สินและอุปกรณ์ตามรายการข้างต้นคืนให้แก่ฝ่ายเทคโนโลยีสารสนเทศเรียบร้อยแล้ว</li>
+                                    <li>เจ้าหน้าที่ฝ่ายไอทีได้ทำการตรวจสอบสภาพทางกายภาพและอุปกรณ์ต่อพ่วงตามที่ระบุในตารางเรียบร้อยแล้ว</li>
+                                    <li>หากพบความเสียหายที่เกิดจากการใช้งานผิดประเภทในภายหลัง บริษัทขอสงวนสิทธิ์ในการดำเนินการตามระเบียบขององค์กร</li>
+                                </ol>
+                            `}
+                        </div>
+                    </div>
+
+                    <!-- Signature Blocks -->
+                    <div class="pt-4">
+                        <div class="grid grid-cols-3 gap-6 text-center text-xs">
+                            <div class="border border-slate-300 rounded-lg p-3.5 flex flex-col justify-between h-36">
+                                <div class="font-bold text-slate-800">${isCheckout ? 'ผู้ส่งมอบ (เจ้าหน้าที่ไอที)' : 'ผู้ส่งคืนอุปกรณ์ (พนักงาน)'}</div>
+                                <div class="space-y-1.5">
+                                    <div class="border-b border-slate-400 w-4/5 mx-auto pt-6"></div>
+                                    <div>( ${isCheckout ? tx.officerName : tx.employee.name} )</div>
+                                    <div class="text-slate-500">วันที่ ......./......./...........</div>
+                                </div>
+                            </div>
+
+                            <div class="border border-slate-300 rounded-lg p-3.5 flex flex-col justify-between h-36">
+                                <div class="font-bold text-slate-800">${isCheckout ? 'ผู้รับมอบอุปกรณ์ (พนักงาน)' : 'ผู้ตรวจรับคืน (เจ้าหน้าที่ไอที)'}</div>
+                                <div class="space-y-1.5">
+                                    <div class="border-b border-slate-400 w-4/5 mx-auto pt-6"></div>
+                                    <div>( ${isCheckout ? tx.employee.name : tx.officerName} )</div>
+                                    <div class="text-slate-500">วันที่ ......./......./...........</div>
+                                </div>
+                            </div>
+
+                            <div class="border border-slate-300 rounded-lg p-3.5 flex flex-col justify-between h-36">
+                                <div class="font-bold text-slate-800">ผู้อนุมัติ / หัวหน้าฝ่าย</div>
+                                <div class="space-y-1.5">
+                                    <div class="border-b border-slate-400 w-4/5 mx-auto pt-6"></div>
+                                    <div>( ................................................... )</div>
+                                    <div class="text-slate-500">วันที่ ......./......./...........</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-slate-400 text-right mt-3">
+                            พิมพ์จากระบบ IT Asset Pro • เอกสารอ้างอิงเลขที่ ${tx.docNo}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('a4-document-content').innerHTML = docHtml;
+            const modal = document.getElementById('print-modal');
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closePrintModal() {
+            document.getElementById('print-modal').classList.add('hidden');
+        }
+
+        // --- 9. CUSTOM CONFIRMATION MODAL ---
+        let confirmCallback = null;
+        function openConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = onConfirm;
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirm-yes-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirmModal();
+        });
+
+        // Start App
+        window.addEventListener('DOMContentLoaded', secureInitApp);
+    </script>
+
+<style>
+button[onclick^="quickDemoLogin"],button[onclick^="selectSimulatedMsAccount"],form[onsubmit^="submitCustomMsEmail"],#btn-reset-demo {display:none!important}
+</style>
+<script>
+/* Nine Distribution connected SharePoint preview: Microsoft auth required; no demo sign-in. */
+const NINE_GRAPH={
+  site:"ninedistribution.sharepoint.com,13d8bc75-67a0-4dbf-b579-8b26c2dd2e9f,dedddf0b-d21b-4660-84ad-259b6ffb0ab4",
+  lists:[{id:"ac67c228-aaa2-44f2-8f8e-72d61dd020f0",category:"Notebook",kind:"computer"},{id:"7a610ea3-7308-4870-a273-9770713f3594",category:"Accessory",kind:"accessory"}]
+};
+let nineSharepointLoaded=false;
+function secureInitApp(){
+ initApp();
+ localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+ currentUser=null;
+ assets=[];transactions=[];showLoginScreen();
+ const hint=document.createElement('p'); hint.className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3';hint.textContent='เวอร์ชันเชื่อมต่อ SharePoint: ต้องตั้งค่า Microsoft Entra Application (Client) ID ก่อนเข้าใช้งาน ขณะนี้เปิดดูข้อมูลแบบอ่านอย่างเดียวเพื่อป้องกันการแก้ไขข้อมูลจริงโดยไม่ตั้งใจ';
+ document.querySelector('#login-screen .max-w-md')?.appendChild(hint);
+}
+quickDemoLogin=()=>showToast('ปิด Demo Login เพื่อความปลอดภัย กรุณาเข้าสู่ระบบด้วย Microsoft 365 จริง','error');
+runSimulatedOAuthFlow=()=>showToast('ไม่อนุญาตให้จำลองบัญชี Microsoft','error');
+saveToStorage=function(){ if(nineSharepointLoaded) return; };
+async function readGraphList(token,list) {
+ let url='https://graph.microsoft.com/v1.0/sites/'+encodeURIComponent(NINE_GRAPH.site)+'/lists/'+list.id+'/items?$top=100&$expand=fields';
+ let out=[];
+ while(url){
+  const resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+  if(!resp.ok)throw new Error('SharePoint '+resp.status+' '+(await resp.text()).slice(0,180));
+  const page=await resp.json();out.push(...(page.value||[]));url=page['@odata.nextLink'];
+ }
+ return out.map(item=>{
+  const f=item.fields||{};const status=String(f.Status||'').toLowerCase();
+  const borrowed=/borrow|assigned|เบิก|ยืม/.test(status);
+  const owner=String(f.UserName0||f.UserName||'').trim();
+  return {id:list.kind==='computer'?String(f.Title||'PC-'+item.id):String('ACC-'+item.id),category:list.kind==='computer'?(String(f.ItemType||'').toLowerCase().includes('pc')?'Notebook':list.category):list.category,
+   brand:f.Vendor||'',model:f.Model||'',serial:f.Assetorserialnumber||f.AssetorserialNumber||'',specs:String(f.ItemType||'')+' | SharePoint ID '+item.id,
+   purchaseDate:'',status:borrowed?'assigned':(/repair|ซ่อม/.test(status)?'repair':'available'),
+   assignedTo:borrowed?{empId:'SP-'+item.id,name:owner||'ผู้ยืม (ข้อมูล SharePoint)',department:'',position:'',contact:'',assignedDate:f.ReceivedDate?String(f.ReceivedDate).slice(0,10):'',dueDate:''}:null,
+   _sp:{listId:list.id,itemId:item.id,rawStatus:f.Status}
+  };
+ });
+}
+initiateMicrosoftLogin=async function(){
+ if(!ssoConfig.clientId||!ssoConfig.tenantId||ssoConfig.tenantId==='common'){
+  showToast('ต้องใส่ Client ID และ Tenant ID ของบริษัทก่อน', 'error');openSsoSetupModal(true);return;
+ }
+ try{
+  const client=new msal.PublicClientApplication({auth:{clientId:ssoConfig.clientId,authority:'https://login.microsoftonline.com/'+ssoConfig.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});
+  if(client.initialize)await client.initialize();
+  const auth=await client.loginPopup({scopes:['User.Read','Sites.Read.All'],prompt:'select_account'});
+  const email=String(auth.account.username||'').toLowerCase();
+  if(!email.endsWith('@ninedistribution.com'))throw Error('อนุญาตเฉพาะบัญชี @ninedistribution.com');
+  let all=[];
+  for(const list of NINE_GRAPH.lists)all.push(...await readGraphList(auth.accessToken,list));
+  assets=all;transactions=[];nineSharepointLoaded=true;checkoutCart=[];
+  const isAdmin=email==='nutsarun@ninedistribution.com';
+  completeMicrosoftSignIn({name:auth.account.name||email,email,role:isAdmin?'admin':'viewer',roleLabel:isAdmin?'IT Admin (Read-only SharePoint preview)':'Viewer (SharePoint)',department:'Nine Distribution',initials:(auth.account.name||email).slice(0,2).toUpperCase()});
+  document.getElementById('nav-checkout')?.classList.add('hidden');
+  document.getElementById('nav-checkin')?.classList.add('hidden');
+  document.getElementById('dashboard-quick-actions')?.classList.add('hidden');
+  document.getElementById('btn-add-asset')?.classList.add('hidden');
+  document.querySelectorAll('button[onclick^="editAsset"],button[onclick^="deleteAsset"]').forEach(b=>b.style.display='none');
+  const banner=document.createElement('div');banner.className='bg-amber-50 text-amber-900 border border-amber-200 rounded-xl p-3 mb-4 text-sm';
+  banner.textContent='เชื่อมต่อ Microsoft Graph สำเร็จ — โหลดทะเบียนทรัพย์สิน '+all.length+' รายการจาก SharePoint จริง (อ่านอย่างเดียว) การเบิก-คืนและแก้ไข SharePoint ยังไม่เปิดใช้งานจนกว่าจะตั้งค่าการเขียนและประวัติธุรกรรมอย่างปลอดภัย';
+  document.querySelector('main')?.prepend(banner);
+ }catch(err){showToast('Microsoft / SharePoint: '+(err?.message||err),'error');}
+};
+</script>
+
+</body>
 </html>
