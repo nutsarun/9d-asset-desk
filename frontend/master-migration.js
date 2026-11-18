@@ -171,8 +171,9 @@ async function chooseListForLogin(){
   if(!found||!String(found.description||"").startsWith(MARKER))return null;
   // Revalidate unique source IDs and row count before using the newly built list.
   const rows=await pages(BASE+"/lists/"+found.id+"/items?$top=100&$expand=fields");
-  const refs=new Set(rows.map(x=>key(x.fields?.SourceListId,x.fields?.SourceItemId)));
-  if(rows.length!==70||refs.size!==rows.length)return null;
+  const migrated=rows.filter(x=>x.fields?.SourceListId&&x.fields?.SourceItemId);
+  const refs=new Set(migrated.map(x=>key(x.fields.SourceListId,x.fields.SourceItemId)));
+  if(migrated.length<70||refs.size!==migrated.length)return null; // Allow subsequent newly created assets without legacy source keys.
   NINE_GRAPH.lists=[{id:found.id,kind:"master",category:"Other"}];
   masterList=found;activeList=found;
   return found;
