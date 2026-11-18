@@ -201,7 +201,7 @@ window.nineCheckin=async function(ev,groupKey){
  await refreshAssetData();showToast('คืนสำเร็จ '+done.length+' รายการ'+(errors.length?' / ผิดพลาด: '+errors.join(' | '):''),errors.length?'error':'success');
 };
 
-const ASSET_CODES={Notebook:'N',Monitor:'M',Smartphone:'S',Accessory:'A',Network:'W',Other:'O'};
+const ASSET_CODES={Notebook:'N',Monitor:'M',Smartphone:'S',Accessory:'A',Mouse:'MO',Network:'W',Other:'O'};
 function nextAssetId(company,cat,ids=assets.map(a=>a.id)){
  const prefix=(String(company).startsWith('After')?'A9IT-':'9DIT-')+(ASSET_CODES[cat]||'O');
  let max=0;for(const id of ids){const match=String(id).match(new RegExp('^'+prefix+'(\\d{4,})$','i'));if(match)max=Math.max(max,Number(match[1]));}
@@ -224,12 +224,16 @@ window.nineSaveAsset=async function(ev){
  const id=document.getElementById('asset-edit-mode').value;
  const a=assets.find(x=>x.id===id);
  const cat=document.getElementById('asset-category').value;
- const list=NINE_GRAPH.lists.find(x=>x.kind==='master')||NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'?'accessory':'computer'));
+ const customType=document.getElementById('asset-custom-category')?.value.trim()||'';
+ if(cat==='Other'&&!customType)return showToast('กรุณาระบุประเภทอุปกรณ์เมื่อเลือก อื่นๆ (Other)','error');
+ if(cat==='Other'&&customType.length>100)return showToast('ชื่อประเภทอุปกรณ์ยาวเกิน 100 ตัวอักษร','error');
+ const itemType=cat==='Other'?customType:cat;
+ const list=NINE_GRAPH.lists.find(x=>x.kind==='master')||NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'||cat==='Mouse'||cat==='Other'?'accessory':'computer'));
  const company=document.getElementById('asset-company')?.value||'Nine distribution co.,ltd';
  const hostname=document.getElementById('asset-id')?.value.trim()||'';
  const valueInput=document.getElementById('asset-value')?.value.trim()||'';
  if(valueInput!==''&&(!Number.isFinite(Number(valueInput))||Number(valueInput)<0))return showToast('กรุณาระบุมูลค่าทรัพย์สินเป็นตัวเลขไม่ติดลบ','error');
- const fields={Title:document.getElementById('asset-id').value.trim(),Vendor:document.getElementById('asset-brand').value.trim(),Model:document.getElementById('asset-model').value.trim(),ItemType:cat,Status:document.getElementById('asset-status').value==='available'?'Stock':document.getElementById('asset-status').value==='repair'?'Repair':'Not available'};
+ const fields={Title:document.getElementById('asset-id').value.trim(),Vendor:document.getElementById('asset-brand').value.trim(),Model:document.getElementById('asset-model').value.trim(),ItemType:itemType,Status:document.getElementById('asset-status').value==='available'?'Stock':document.getElementById('asset-status').value==='repair'?'Repair':'Not available'};
  fields[list.kind==='accessory'?'AssetorserialNumber':'Assetorserialnumber']=document.getElementById('asset-serial').value.trim();
  fields[list.kind==='accessory'?'Owner':'Company']=list.kind==='master'?company:list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
  try{
