@@ -7,7 +7,7 @@ const EMP_LIST_NAME='9D Asset Employees';
 let directory=[], employeeListId=null, employeeSource='local';
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
-const admin=()=>!!(window.nineGraphAuth && currentUser && ADMINS.has(currentUser.email.toLowerCase()));
+const admin=()=>!!(window.nineGraphAuth && currentUser && (window.nineCan?.('write') ?? ADMINS.has(currentUser.email.toLowerCase())));
 const path=(listId,itemId)=>'https://graph.microsoft.com/v1.0/sites/'+SITE+'/lists/'+listId+'/items'+(itemId?'/'+itemId:'');
 async function graph(url,method='GET',body=null,write=false,etag=null){
  const auth=window.nineGraphAuth;
