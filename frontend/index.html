@@ -119,9 +119,7 @@
                 
                 <div class="relative z-10">
                     <div class="inline-flex items-center gap-3 bg-slate-800/80 border border-slate-700/80 px-3.5 py-2 rounded-2xl mb-8">
-                        <div class="bg-brand-600 p-2 rounded-xl">
-                            <i data-lucide="shield-check" class="w-5 h-5 text-white"></i>
-                        </div>
+                        <img src="./nine-distribution-brand.webp" alt="Nine Distribution" class="w-20 h-14 object-contain rounded-xl bg-white p-1">
                         <div>
                             <span class="font-bold text-sm tracking-wide block">IT Asset Pro Enterprise</span>
                             <span class="text-[11px] text-slate-400">Single Sign-On (Microsoft Entra ID)</span>
@@ -337,9 +335,7 @@
         <!-- Mobile Header -->
         <header class="lg:hidden bg-slate-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
             <div class="flex items-center gap-2.5">
-                <div class="bg-brand-600 p-2 rounded-lg">
-                    <i data-lucide="laptop" class="w-5 h-5 text-white"></i>
-                </div>
+                <img src="./nine-distribution-brand.webp" alt="Nine Distribution" class="w-16 h-12 object-contain rounded-lg bg-white p-1" loading="eager">
                 <div>
                     <h1 class="font-bold text-base leading-tight">IT Asset Pro</h1>
                     <p class="text-[11px] text-slate-400">Microsoft Entra ID SSO</p>
@@ -1433,10 +1429,6 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
             localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(currentUser));
             switchTab('dashboard');
             showAuthenticatedApp();
-            // On mobile, always reveal the default Dashboard after authentication.
-            document.querySelectorAll('.tab-content').forEach(section => section.classList.toggle('hidden', section.id !== 'tab-dashboard'));
-            document.getElementById('tab-dashboard')?.classList.remove('hidden');
-            window.nineMobileTabs?.show?.('dashboard');
             showToast(`ยินดีต้อนรับ ${currentUser.name} (${currentUser.roleLabel})`, 'success');
         }
 
@@ -2620,7 +2612,6 @@ initiateMicrosoftLogin=async function(){
   window.nineMaster?.buildMenu();
   document.getElementById('nav-master')?.classList.toggle('hidden',!isAdmin);
   window.nineUpgradeAfterLogin?.();
-  window.nineMobileTabs?.show?.('dashboard');
   const banner=document.createElement('div');banner.className='bg-amber-50 text-amber-900 border border-amber-200 rounded-xl p-3 mb-4 text-sm';
   banner.textContent='เชื่อมต่อ Microsoft Graph สำเร็จ — โหลดทะเบียนทรัพย์สิน '+all.length+' รายการจาก SharePoint จริง (ข้อมูลพนักงานและการเบิก-คืนต้องได้รับ Sites.ReadWrite.All และสิทธิ์แก้ไข SharePoint; เอกสารธุรกรรมยังเก็บชั่วคราวในเบราว์เซอร์';
   document.querySelector('main')?.prepend(banner);
@@ -2633,6 +2624,5 @@ initiateMicrosoftLogin=async function(){
 <script src="./annual-review-v2.js"></script>
 <script src="./master-migration.js"></script>
 <script src="./valuation-dashboard.js"></script>
-<script src="./mobile-navigation.js"></script>
 </body>
 </html>
