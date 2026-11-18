@@ -154,7 +154,7 @@ async function checkoutItem(a,employee,date){
  const live=await currentAsset(a);
  if(live.busy||live.status==='lost'||live.status==='not available'||live.status==='repair')throw Error('อุปกรณ์ '+a.id+' ไม่พร้อมให้เบิก: '+(live.fields.Status||'')+(live.holder?' (ผู้ถือครอง: '+live.holder+')':''));
  const col=a._sp.kind==='computer'?'_x0e4a_UserName':'UserName0';
- await graph(path(a._sp.listId,a._sp.itemId)+'/fields','PATCH',{Status:a._sp.kind==='computer'?'In -Use':'Borrowed',[col]:employee.name,ReceivedDate:date+'T07:00:00Z'},true,live.item['@odata.etag']||live.fields?.['@odata.etag']);
+ await graph(path(a._sp.listId,a._sp.itemId)+'/fields','PATCH',{Status:a._sp.kind==='computer'?'In -Use':'Borrowed',[col]:employee.name,ReceivedDate:a._sp.kind==='master'?date:date+'T07:00:00Z'},true,live.item['@odata.etag']||live.fields?.['@odata.etag']);
 }
 async function checkinItem(a){
  const live=await currentAsset(a);
@@ -224,12 +224,12 @@ window.nineSaveAsset=async function(ev){
  const id=document.getElementById('asset-edit-mode').value;
  const a=assets.find(x=>x.id===id);
  const cat=document.getElementById('asset-category').value;
- const list=NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'?'accessory':'computer'));
+ const list=NINE_GRAPH.lists.find(x=>x.kind==='master')||NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'?'accessory':'computer'));
  const company=document.getElementById('asset-company')?.value||'Nine distribution co.,ltd';
  const hostname=document.getElementById('asset-hostname')?.value.trim()||'';
  const fields={Title:document.getElementById('asset-id').value.trim(),Vendor:document.getElementById('asset-brand').value.trim(),Model:document.getElementById('asset-model').value.trim(),ItemType:cat,Status:document.getElementById('asset-status').value==='available'?'Stock':document.getElementById('asset-status').value==='repair'?'Repair':'Not available'};
- fields[list.kind==='computer'?'Assetorserialnumber':'AssetorserialNumber']=document.getElementById('asset-serial').value.trim();
- fields[list.kind==='computer'?'Company':'Owner']=list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
+ fields[list.kind==='accessory'?'AssetorserialNumber':'Assetorserialnumber']=document.getElementById('asset-serial').value.trim();
+ fields[list.kind==='accessory'?'Owner':'Company']=list.kind==='master'?company:list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
  try{
   const hostSupported=await hasAssetColumn(list.id,'HostName');
   if(hostname && !hostSupported)throw Error('SharePoint List นี้ยังไม่มีคอลัมน์ HostName กรุณาเพิ่มคอลัมน์ Single line of text ชื่อ HostName');
@@ -241,6 +241,7 @@ window.nineSaveAsset=async function(ev){
   }else{
    const allIds=await liveAssetIds();
    fields.Title=nextAssetId(company,cat,allIds);
+   if(list.kind==='master')fields.AssetID=fields.Title;
    if(hostSupported)fields.HostName=fields.Title;
    if(allIds.some(x=>String(x).toLowerCase()===fields.Title.toLowerCase()))throw Error('Asset ID ซ้ำ');
    await graph(path(list.id),'POST',{fields},true);
