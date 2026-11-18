@@ -33,9 +33,29 @@ function setup(){
   label.innerHTML+='<input id="asset-hostname" readonly class="w-full border p-2 rounded-lg bg-slate-100" placeholder="เท่ากับ Asset ID เสมอ"><span class="text-xs text-slate-500">Host name = Asset ID โดยไม่เปลี่ยนรหัสเดิม</span>';d.append(label);
   const v=document.createElement('label');v.className='text-sm';v.textContent='มูลค่าทรัพย์สิน (บาท)';v.innerHTML+='<input type="number" min="0" step="0.01" id="asset-value" class="w-full border p-2 rounded-lg" placeholder="ระบุมูลค่า เช่น 25000.00">';d.append(v);
   $('asset-edit-mode')?.insertAdjacentElement('afterend',d);
-  $('asset-company').onchange=autoId;$('asset-category').onchange=autoId;
+  $('asset-company').onchange=autoId;$('asset-category').onchange=()=>{autoId();window.nineUpdateCustomCategory?.()};
  }
- for(const id of ['asset-category','inv-filter-category','co-cat-filter']){const sel=$(id);if(sel&&!sel.querySelector('option[value="Other"]'))sel.add(new Option('อื่นๆ (Other)','Other'));}
+ for(const id of ['asset-category','inv-filter-category','co-cat-filter']){
+  const sel=$(id);if(!sel)continue;
+  if(!sel.querySelector('option[value="Mouse"]'))sel.add(new Option('Mouse (เมาส์)','Mouse'));
+  if(!sel.querySelector('option[value="Other"]'))sel.add(new Option('อื่นๆ (Other)','Other'));
+ }
+ const categorySelect=$('asset-category');
+ if(categorySelect&&!$('asset-custom-category')){
+  const wrap=document.createElement('label');wrap.id='asset-custom-category-wrap';
+  wrap.className='block text-xs font-semibold text-slate-700 mt-2 hidden';
+  wrap.textContent='ระบุประเภทอุปกรณ์อื่นๆ / Specify asset category *';
+  const field=document.createElement('input');field.id='asset-custom-category';field.type='text';field.maxLength=100;
+  field.className='mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm';
+  field.placeholder='ตัวอย่าง: Keyboard, Docking Station, Printer';
+  wrap.append(field);categorySelect.parentElement.append(wrap);
+  window.nineUpdateCustomCategory=()=>{
+    const isOther=categorySelect.value==='Other';
+    wrap.classList.toggle('hidden',!isOther);field.required=isOther;field.disabled=!isOther;
+    if(!isOther)field.value='';
+  };
+  window.nineUpdateCustomCategory();
+ }
  const inventoryHeader=$('tab-inventory')?.querySelector('h2')?.parentElement?.parentElement;
  if(inventoryHeader&&!$('nine-backup-csv')){
   const b=document.createElement('button');b.id='nine-backup-csv';b.className='bg-white border rounded-xl px-4 py-2 text-sm';b.textContent='Export CSV Backup';
@@ -67,6 +87,18 @@ openAssetModal=function(id=null){
  const ret=previousOpen(id);const a=id?assets.find(x=>x.id===id):null;
  $('asset-company').value=a?.company||COMPANY[0];$('asset-hostname').value=a?.id||'';
  if($('asset-value'))$('asset-value').value=a?.assetValue??'';
+ const categoryField=$('asset-category');
+ const customField=$('asset-custom-category');
+ if(a){
+   const known=['Notebook','Monitor','Smartphone','Accessory','Mouse','Network'];
+   if(known.includes(a.category)){categoryField.value=a.category;}
+   else {categoryField.value='Other';if(customField)customField.value=a.assetType&&a.assetType!=='Other'?a.assetType:a.category;}
+ }else if(customField){customField.value='';}
+ if(window.nineUpdateCustomCategory){
+   const custom=customField?.value||'';
+   window.nineUpdateCustomCategory();
+   if(categoryField.value==='Other'&&customField)customField.value=custom;
+ }
  $('asset-id').readOnly=true;if(!a)autoId();return ret;
 };
 function csvValue(value){
