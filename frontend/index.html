@@ -984,11 +984,7 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
             SSO_CONFIG: 'it_asset_pro_sso_config_v1'
         };
 
-        const DEFAULT_SSO_CONFIG = {
-            clientId: '',
-            tenantId: 'common',
-            allowedDomain: '@company.co.th'
-        };
+        const DEFAULT_SSO_CONFIG = {clientId:'178f1150-e195-4b9b-b33e-8b901c6055b6',tenantId:'deb51c3d-835b-4e46-88b3-a0d874442dd2',allowedDomain:'@ninedistribution.com'};
 
         const DEMO_ACCOUNTS = {
             admin: {
@@ -1225,9 +1221,7 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                 saveToStorage();
             }
 
-            if (savedSso) {
-                ssoConfig = { ...DEFAULT_SSO_CONFIG, ...JSON.parse(savedSso) };
-            }
+            if (savedSso) { ssoConfig = {...DEFAULT_SSO_CONFIG}; localStorage.removeItem(STORAGE_KEYS.SSO_CONFIG); }
             updateLoginScreenSsoHints();
 
             // Set today's date as default on checkout form
@@ -2546,6 +2540,8 @@ const NINE_GRAPH={
 let nineSharepointLoaded=false;
 function secureInitApp(){
  initApp();
+ ssoConfig={...DEFAULT_SSO_CONFIG};
+ updateLoginScreenSsoHints();
  localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
  currentUser=null;
  assets=[];transactions=[];showLoginScreen();
