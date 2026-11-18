@@ -2561,8 +2561,8 @@ async function readGraphList(token,list) {
  }
  return out.map(item=>{
   const f=item.fields||{};const status=String(f.Status||'').toLowerCase();
-  const owner=String(list.kind==='computer'?(f._x0e4a_UserName||f.UserName||''):(f.UserName0||f.UserName||'')).replace(/\\t/g,' ').replace(/\s+/g,' ').trim();
-  const borrowed=/borrow|assign|in\\s*-?\\s*use|เบิก|ยืม|ใช้งาน/.test(status)||Boolean(owner);
+  const owner=String(list.kind==='computer'?(f._x0e4a_UserName||f.UserName||''):(f.UserName0||f.UserName||'')).replace(/\t/g,' ').replace(/\s+/g,' ').trim();
+  const borrowed=/borrow|assign|in\s*-?\s*use|เบิก|ยืม|ใช้งาน/.test(status)||Boolean(owner);
   return {id:list.kind==='computer'?String(f.Title||'PC-'+item.id):String('ACC-'+item.id),category:list.kind==='computer'?(String(f.ItemType||'').toLowerCase().includes('pc')?'Notebook':list.category):list.category,
    brand:f.Vendor||'',model:f.Model||'',serial:f.Assetorserialnumber||f.AssetorserialNumber||'',specs:String(f.ItemType||'')+' | SharePoint ID '+item.id,
    purchaseDate:'',status:borrowed?'assigned':(/repair|ซ่อม/.test(status)?'repair':(/lost|not available|retired|จำหน่าย|สูญหาย/.test(status)?'retired':'available')),
