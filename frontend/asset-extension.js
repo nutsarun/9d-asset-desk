@@ -243,8 +243,11 @@ window.nineSaveAsset=async function(ev){
   if(hostSupported)fields.HostName=list.kind==='master'?(a?.id||fields.Title):(hostname||fields.Title);
   if(a){
    if(a._sp.kind!==list.kind)throw Error('ไม่สามารถย้ายรายการข้าม List กรุณาสร้างรายการใหม่');
-   if(a.status==='assigned')throw Error('ห้ามแก้ข้อมูลทรัพย์สินขณะมีผู้ถือครอง');
-   await patchAsset(a,fields);
+   if(a.status==='assigned'){
+    if(list.kind!=='master')throw Error('ไม่สามารถแก้รายการที่มีผู้ถือครองบน List เดิม');
+    if(fields.AssetValue===undefined)throw Error('ไม่มีคอลัมน์มูลค่า');
+    await patchAsset(a,{AssetValue:fields.AssetValue});
+   }else await patchAsset(a,fields);
   }else{
    const allIds=await liveAssetIds();
    fields.Title=nextAssetId(company,cat,allIds);
