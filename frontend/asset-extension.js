@@ -226,14 +226,21 @@ window.nineSaveAsset=async function(ev){
  const cat=document.getElementById('asset-category').value;
  const list=NINE_GRAPH.lists.find(x=>x.kind==='master')||NINE_GRAPH.lists.find(x=>x.kind===(cat==='Accessory'?'accessory':'computer'));
  const company=document.getElementById('asset-company')?.value||'Nine distribution co.,ltd';
- const hostname=document.getElementById('asset-hostname')?.value.trim()||'';
+ const hostname=document.getElementById('asset-id')?.value.trim()||'';
+ const valueInput=document.getElementById('asset-value')?.value.trim()||'';
+ if(valueInput!==''&&(!Number.isFinite(Number(valueInput))||Number(valueInput)<0))return showToast('กรุณาระบุมูลค่าทรัพย์สินเป็นตัวเลขไม่ติดลบ','error');
  const fields={Title:document.getElementById('asset-id').value.trim(),Vendor:document.getElementById('asset-brand').value.trim(),Model:document.getElementById('asset-model').value.trim(),ItemType:cat,Status:document.getElementById('asset-status').value==='available'?'Stock':document.getElementById('asset-status').value==='repair'?'Repair':'Not available'};
  fields[list.kind==='accessory'?'AssetorserialNumber':'Assetorserialnumber']=document.getElementById('asset-serial').value.trim();
  fields[list.kind==='accessory'?'Owner':'Company']=list.kind==='master'?company:list.kind==='computer'?(company.startsWith('After')?'After9':'9Distribution'):(company.startsWith('After')?'After Nine':'Ninedistribution');
  try{
   const hostSupported=await hasAssetColumn(list.id,'HostName');
+  if(list.kind==='master'){
+   if(!(await hasAssetColumn(list.id,'AssetValue')))throw Error('ยังไม่มีคอลัมน์ AssetValue ใน Master List กรุณากดปุ่ม เตรียมมูลค่าและซิงก์ Asset ID ที่ Dashboard');
+   fields.AssetValue=valueInput===''?null:Number(valueInput);
+   if(a){fields.Title=a.id;fields.AssetID=a.id;fields.HostName=a.id;}
+  }
   if(hostname && !hostSupported)throw Error('SharePoint List นี้ยังไม่มีคอลัมน์ HostName กรุณาเพิ่มคอลัมน์ Single line of text ชื่อ HostName');
-  if(hostSupported)fields.HostName=hostname||fields.Title;
+  if(hostSupported)fields.HostName=list.kind==='master'?(a?.id||fields.Title):(hostname||fields.Title);
   if(a){
    if(a._sp.kind!==list.kind)throw Error('ไม่สามารถย้ายรายการข้าม List กรุณาสร้างรายการใหม่');
    if(a.status==='assigned')throw Error('ห้ามแก้ข้อมูลทรัพย์สินขณะมีผู้ถือครอง');
@@ -241,7 +248,7 @@ window.nineSaveAsset=async function(ev){
   }else{
    const allIds=await liveAssetIds();
    fields.Title=nextAssetId(company,cat,allIds);
-   if(list.kind==='master')fields.AssetID=fields.Title;
+   if(list.kind==='master'){fields.AssetID=fields.Title;fields.HostName=fields.Title;}
    if(hostSupported)fields.HostName=fields.Title;
    if(allIds.some(x=>String(x).toLowerCase()===fields.Title.toLowerCase()))throw Error('Asset ID ซ้ำ');
    await graph(path(list.id),'POST',{fields},true);

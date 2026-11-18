@@ -9,7 +9,7 @@ const SOURCES=[
  {id:"ac67c228-aaa2-44f2-8f8e-72d61dd020f0",kind:"computer",name:"Computer"},
  {id:"7a610ea3-7308-4870-a273-9770713f3594",kind:"accessory",name:"Accessories"}
 ];
-const COLS=["AssetID","HostName","Vendor","Model","ItemType","Assetorserialnumber","Status","UserName0","Company","ReceivedDate","ReturnedDate","Datepurchased","Warranty","SourceListId","SourceItemId","SourceKind","OriginalTitle","OldUser","Remark","AttachmentsFlag","SourceLink"];
+const COLS=["AssetID","HostName","Vendor","Model","ItemType","Assetorserialnumber","Status","UserName0","Company","ReceivedDate","ReturnedDate","Datepurchased","Warranty","SourceListId","SourceItemId","SourceKind","OriginalTitle","OldUser","Remark","AttachmentsFlag","SourceLink","AssetValue"];
 let running=false,masterList=null,activeList=null;
 const role=()=>["nutsarun@ninedistribution.com","satit@ninedistribution.com"].includes(String(currentUser?.email||"").toLowerCase());
 const norm=v=>String(v??"").replace(/\s+/g," ").trim();
@@ -63,7 +63,7 @@ function projection(s){
  const serial=norm(isComputer?f.Assetorserialnumber:f.AssetorserialNumber);
  const original=String(f.Remark||"").slice(0,245);
  const out={
-  Title:code,AssetID:code,HostName:host,Vendor:String(f.Vendor||"").slice(0,250),
+  Title:code,AssetID:code,HostName:code,Vendor:String(f.Vendor||"").slice(0,250),
   Model:String(f.Model||"").slice(0,250),ItemType:String(f.ItemType||"").slice(0,250),
   Assetorserialnumber:serial,Status:String(f.Status||""),
   UserName0:owner,Company:company,
@@ -72,13 +72,13 @@ function projection(s){
   SourceListId:s.source.id,SourceItemId:String(s.row.id),SourceKind:s.source.kind,
   OriginalTitle:title,OldUser:String(f.OldUser||"").slice(0,245),
   Remark:original,AttachmentsFlag:f.Attachments?"Yes":"No",
-  SourceLink:String(s.row.web_url||"").slice(0,250)
+  SourceLink:String(s.row.web_url||"").slice(0,250),AssetValue:""
  };
  for(const k of Object.keys(out)){out[k]=String(out[k]).slice(0,255);}
  return out;
 }
 function matched(a,b){
- const keys=["Title","AssetID","HostName","Vendor","Model","ItemType","Assetorserialnumber","Status","UserName0","Company","SourceListId","SourceItemId","SourceKind","OriginalTitle","AttachmentsFlag"];
+ const keys=["Title","AssetID","Vendor","Model","ItemType","Assetorserialnumber","Status","UserName0","Company","SourceListId","SourceItemId","SourceKind","OriginalTitle","AttachmentsFlag"];
  return keys.every(k=>String(a[k]||"")===String(b[k]||""));
 }
 async function inspectMaster(source,master){
@@ -112,7 +112,7 @@ async function ensureColumns(master){
  for(const column of COLS){
   if(seen.has(column))continue;
   status("กำลังสร้างคอลัมน์ "+column);
-  await request(uri,"POST",{name:column,text:{}},["Sites.Manage.All"]);
+  await request(uri,"POST",column==="AssetValue"?{name:column,number:{decimalPlaces:"two"}}:{name:column,text:{}},["Sites.Manage.All"]);
  }
 }
 async function copyAndVerify(){

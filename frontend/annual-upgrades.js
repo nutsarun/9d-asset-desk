@@ -30,7 +30,8 @@ function setup(){
   const d=document.createElement('div');d.className='grid grid-cols-2 gap-3';
   d.append(select('asset-company','สังกัดบริษัท'));
   const label=document.createElement('label');label.className='text-sm';label.textContent='Host name (SharePoint)';
-  label.innerHTML+='<input id="asset-hostname" class="w-full border p-2 rounded-lg" placeholder="Host name / Computer name"><span class="text-xs text-slate-500">คอลัมน์ SharePoint: HostName</span>';d.append(label);
+  label.innerHTML+='<input id="asset-hostname" readonly class="w-full border p-2 rounded-lg bg-slate-100" placeholder="เท่ากับ Asset ID เสมอ"><span class="text-xs text-slate-500">Host name = Asset ID โดยไม่เปลี่ยนรหัสเดิม</span>';d.append(label);
+  const v=document.createElement('label');v.className='text-sm';v.textContent='มูลค่าทรัพย์สิน (บาท)';v.innerHTML+='<input type="number" min="0" step="0.01" id="asset-value" class="w-full border p-2 rounded-lg" placeholder="ระบุมูลค่า เช่น 25000.00">';d.append(v);
   $('asset-edit-mode')?.insertAdjacentElement('afterend',d);
   $('asset-company').onchange=autoId;$('asset-category').onchange=autoId;
  }
@@ -38,7 +39,7 @@ function setup(){
  const inventoryHeader=$('tab-inventory')?.querySelector('h2')?.parentElement?.parentElement;
  if(inventoryHeader&&!$('nine-backup-csv')){
   const b=document.createElement('button');b.id='nine-backup-csv';b.className='bg-white border rounded-xl px-4 py-2 text-sm';b.textContent='Export CSV Backup';
-  b.onclick=()=>csv('9D-Assets-Backup',assets.map(a=>({AssetID:a.id,Company:a.company||COMPANY[0],HostName:a.hostname,Category:a.category,Brand:a.brand,Model:a.model,SerialNumber:a.serial,Status:a.status,UserName:a.assignedTo?.name,ReceivedDate:a.assignedTo?.assignedDate,SharePointItemID:a._sp?.itemId,SharePointListID:a._sp?.listId})));
+  b.onclick=()=>csv('9D-Assets-Backup',assets.map(a=>({AssetID:a.id,Company:a.company||COMPANY[0],HostName:a.id,AssetValueTHB:a.assetValue??'',Category:a.category,Brand:a.brand,Model:a.model,SerialNumber:a.serial,Status:a.status,UserName:a.assignedTo?.name,ReceivedDate:a.assignedTo?.assignedDate,SharePointItemID:a._sp?.itemId,SharePointListID:a._sp?.listId})));
   inventoryHeader.append(b);
  }
  const nav=$('sidebar')?.querySelector('nav');
@@ -59,11 +60,13 @@ function setup(){
 function autoId(){
  if($('asset-edit-mode')?.value!=='add')return;
  $('asset-id').value=window.nineNextAssetId?.($('asset-company').value,$('asset-category').value)||'';
+ if($('asset-hostname'))$('asset-hostname').value=$('asset-id').value;
 }
 const previousOpen=openAssetModal;
 openAssetModal=function(id=null){
  const ret=previousOpen(id);const a=id?assets.find(x=>x.id===id):null;
- $('asset-company').value=a?.company||COMPANY[0];$('asset-hostname').value=a?.hostname||'';
+ $('asset-company').value=a?.company||COMPANY[0];$('asset-hostname').value=a?.id||'';
+ if($('asset-value'))$('asset-value').value=a?.assetValue??'';
  $('asset-id').readOnly=true;if(!a)autoId();return ret;
 };
 function csvValue(value){
@@ -161,7 +164,7 @@ function auditPrintBody(g){
 function printAudit(index){const g=groups(),selected=index===null?g:(g[index]?[g[index]]:[]);if(!selected.length)return showToast('ไม่มีข้อมูล','error');displayPrint(selected.map(auditPrintBody).join(''));}
 window.nineAuditPrint=index=>printAudit(index);
 function exportAudit(){
- const rows=groups().flatMap(g=>g.items.map(a=>{const v=audit(a);return {Year:auditYear(),Company:g.company,Employee:g.name,AssetID:a.id,HostName:a.hostname,Category:a.category,Brand:a.brand,Model:a.model,Serial:a.serial,Condition:v.condition||'',Complete:v.complete||'',Note:v.note||'',CheckedAt:v.checkedAt||'',CheckedBy:v.checkedBy||''}}));
+ const rows=groups().flatMap(g=>g.items.map(a=>{const v=audit(a);return {Year:auditYear(),Company:g.company,Employee:g.name,AssetID:a.id,HostName:a.id,AssetValueTHB:a.assetValue??'',Category:a.category,Brand:a.brand,Model:a.model,Serial:a.serial,Condition:v.condition||'',Complete:v.complete||'',Note:v.note||'',CheckedAt:v.checkedAt||'',CheckedBy:v.checkedBy||''}}));
  csv('Annual-Asset-Audit-'+auditYear(),rows);
 }
 window.nineUpgradeAfterLogin=function(){renderAnnual()};

@@ -2564,7 +2564,8 @@ async function readGraphList(token,list) {
   const owner=String(list.kind==='computer'?(f._x0e4a_UserName||f.UserName||''):(f.UserName0||f.UserName||'')).replace(/\t/g,' ').replace(/\s+/g,' ').trim();
   const borrowed=/borrow|assign|in\s*-?\s*use|เบิก|ยืม|ใช้งาน/.test(status)||Boolean(owner);
   return {id:String(list.kind==='master'?(f.AssetID||f.Title):(f.HostName||(list.kind==='computer'?f.Title:null)||((list.kind==='computer'?'PC-':'ACC-')+item.id))),category:(/notebook/i.test(String(f.ItemType))?'Notebook':/monitor/i.test(String(f.ItemType))?'Monitor':/smartphone|tablet/i.test(String(f.ItemType))?'Smartphone':/network/i.test(String(f.ItemType))?'Network':list.category),
-   company:(/after|a9/i.test(String(f.Company||f.Owner||''))?'After Nine Co.,ltd':'Nine distribution co.,ltd'),hostname:f.HostName||'',
+   company:(/after|a9/i.test(String(f.Company||f.Owner||''))?'After Nine Co.,ltd':'Nine distribution co.,ltd'),hostname:(list.kind==='master'?(f.AssetID||f.Title):f.HostName)||'',
+   assetValue:(f.AssetValue===null||f.AssetValue===undefined||f.AssetValue==='')?null:Number(f.AssetValue),
    brand:f.Vendor||'',model:f.Model||'',serial:f.Assetorserialnumber||f.AssetorserialNumber||'',specs:String(f.ItemType||'')+' | SharePoint ID '+item.id,
    purchaseDate:'',status:borrowed?'assigned':(/repair|ซ่อม/.test(status)?'repair':(/lost|not available|retired|จำหน่าย|สูญหาย/.test(status)?'retired':'available')),
    assignedTo:borrowed?{empId:'SP-'+item.id,name:owner||'ผู้ยืม (ข้อมูล SharePoint)',department:'',position:'',contact:'',assignedDate:f.ReceivedDate?String(f.ReceivedDate).slice(0,10):'',dueDate:''}:null,
