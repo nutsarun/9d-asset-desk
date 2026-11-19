@@ -2358,7 +2358,7 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                             <span>ดู / พิมพ์เอกสาร</span>
                         </button>
                         ${tx.pdfStatus === 'saved' && tx.pdfUrl
-                            ? `<a href="${tx.pdfUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">เปิด PDF ใน SharePoint</a>`
+                            ? `<a href="${tx.pdfUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">เปิด PDF ใน SharePoint</a><button type="button" onclick="window.nineRepairArchive('${tx.docNo}')" class="ml-2 inline-flex items-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700" title="สร้าง PDF ใหม่เพื่อแทนที่ไฟล์เปล่า โดยไม่ส่งมอบซ้ำ">ซ่อม PDF</button>`
                             : `<button type="button" onclick="window.nineRetryArchive('${tx.docNo}')" class="ml-2 inline-flex items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700">${tx.pdfStatus === 'saving' ? 'กำลังบันทึก PDF...' : 'บันทึก PDF ไป SharePoint'}</button>`}
                     </td>
                 </tr>
