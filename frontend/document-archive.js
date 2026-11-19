@@ -44,28 +44,59 @@ function pdfLibrary(){
 async function pdfBlob(tx){
  if(typeof window.nineRenderHandoverPaper!=='function')throw Error('ไม่พบแม่แบบเอกสาร HO/RT');
  const lib=await pdfLibrary();
+ const html=window.nineRenderHandoverPaper(tx);
+ if(!html||!html.includes('ho-paper')||!html.includes(safeHTML(tx.docNo)))
+  throw Error('ไม่สามารถสร้างเนื้อหาเอกสาร HO/RT ได้');
+ // html2canvas does not reliably capture elements positioned far outside the viewport.
+ // Render the document at an actual on-screen coordinate, behind an opaque progress panel.
+ const overlay=document.createElement('div');
+ overlay.id='nine-pdf-render-overlay';
+ overlay.style.cssText='position:fixed;inset:0;z-index:99999;overflow:auto;background:#f1f5f9;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;';
+ overlay.innerHTML='<div style="width:100%;max-width:720px;font:600 14px Sarabun,sans-serif;color:#334155;text-align:center">กำลังสร้าง PDF จากใบรับมอบ/รับคืน โปรดอย่าปิดหน้านี้</div>';
  const container=document.createElement('div');
- container.setAttribute('aria-hidden','true');container.className='ho-pdf-capture';
- container.style.cssText='position:fixed;left:-12000px;top:0;width:186mm;background:#fff;color:#1e293b;z-index:-10;padding:0;margin:0;';
- container.innerHTML=window.nineRenderHandoverPaper(tx);
- document.body.appendChild(container);
+ container.className='ho-pdf-capture';
+ container.style.cssText='position:relative;left:0;top:0;display:block;width:186mm;max-width:none;min-height:100mm;background:#fff;color:#1e293b;padding:0;margin:0;box-sizing:border-box;flex:none;';
+ container.innerHTML=html;
+ overlay.appendChild(container);
+ document.body.appendChild(overlay);
  try{
   await document.fonts?.ready;
   await Promise.all([...container.querySelectorAll('img')].map(img=>new Promise((resolve,reject)=>{
    if(img.complete){if(img.naturalWidth)resolve();else reject(Error('โหลดโลโก้ใน PDF ไม่สำเร็จ'));return}
    img.onload=resolve;img.onerror=()=>reject(Error('โหลดโลโก้ใน PDF ไม่สำเร็จ'));
   })));
-  const result=await lib().set({
+  // Force browser layout and a painted frame before rasterizing.
+  if(container.getBoundingClientRect().width<200 || container.getBoundingClientRect().height<100)
+   throw Error('แบบฟอร์มไม่แสดงบนหน้าเว็บ จึงยกเลิกการสร้าง PDF');
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const worker=lib().set({
    margin:[12,12,12,12],
    image:{type:'jpeg',quality:0.98},
    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0,logging:false},
    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
    pagebreak:{mode:['css','legacy'],before:'.ho-page:not(:first-child)'}
-  }).from(container).outputPdf('blob');
-  if(!(result instanceof Blob)||result.size<1000)throw Error('สร้างไฟล์ PDF ไม่สมบูรณ์');
+  }).from(container);
+  await worker.toCanvas();
+  const canvas=await worker.get('canvas');
+  // Detect blank/white pages before we upload anything to SharePoint.
+  if(!canvas || canvas.width<400 || canvas.height<300)throw Error('ตัวสร้าง PDF ไม่พบภาพเอกสาร');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  if(!ctx)throw Error('ไม่สามารถตรวจสอบภาพเอกสาร');
+  const {data}=ctx.getImageData(0,0,canvas.width,canvas.height);
+  let visible=0;const pixelCount=canvas.width*canvas.height, stride=Math.max(1,Math.floor(pixelCount/50000));
+  for(let p=0;p<pixelCount;p+=stride){
+   const n=p*4;
+   if(data[n]<205 || data[n+1]<205 || data[n+2]<205)visible++;
+  }
+  if(visible<35)throw Error('ตรวจพบหน้ากระดาษเปล่า ระบบยกเลิกการบันทึก PDF เพื่อป้องกันไฟล์เสีย');
+  const result=await worker.toPdf().outputPdf('blob');
+  if(!(result instanceof Blob)||result.size<3000)throw Error('สร้างไฟล์ PDF ไม่สมบูรณ์');
+  const beginning=await result.slice(0,5).text();
+  if(beginning!=='%PDF-')throw Error('ไฟล์ที่สร้างไม่ใช่ PDF ที่ถูกต้อง');
   return result;
- }finally{container.remove()}
+ }finally{overlay.remove()}
 }
+function safeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function persist(){
  try{sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions))}catch(e){console.warn('Cannot cache document link',e)}
  if(typeof renderHistory==='function')renderHistory();
