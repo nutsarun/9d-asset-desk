@@ -764,15 +764,15 @@
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full min-w-[1380px] text-left border-collapse table-auto">
                             <thead>
                                 <tr class="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
                                     <th class="py-3.5 px-4">เลขที่เอกสาร</th>
                                     <th class="py-3.5 px-4">ประเภทธุรกรรม</th>
                                     <th class="py-3.5 px-4">วันที่ทำรายการ</th>
-                                    <th class="py-3.5 px-4">พนักงาน (รหัส / แผนก)</th>
-                                    <th class="py-3.5 px-4">รายการอุปกรณ์ & ผู้ดำเนินการ</th>
-                                    <th class="py-3.5 px-4 text-right">พิมพ์เอกสาร</th>
+                                    <th class="py-3.5 px-4 min-w-[255px]">พนักงาน (รหัส / แผนก)</th>
+                                    <th class="py-3.5 px-4 min-w-[275px]">รายการอุปกรณ์ & ผู้ดำเนินการ</th>
+                                    <th class="py-3.5 px-4 min-w-[375px] text-right">พิมพ์เอกสาร</th>
                                 </tr>
                             </thead>
                             <tbody id="history-tbody" class="divide-y divide-slate-100 text-sm">
@@ -2344,9 +2344,9 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                             : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">ใบตรวจรับคืน (Check-In)</span>'}
                     </td>
                     <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">${formatThaiDate(tx.date)}</td>
-                    <td class="py-3.5 px-4">
-                        <div class="font-semibold text-slate-900">${tx.employee.name}</div>
-                        <div class="text-xs text-slate-500">${tx.employee.empId} • ${tx.employee.department}</div>
+                    <td class="py-3.5 px-4 min-w-[255px] align-middle">
+                        <div class="font-semibold text-slate-900 whitespace-nowrap">${tx.employee.name}</div>
+                        <div class="text-xs text-slate-500 whitespace-nowrap mt-1">${tx.employee.empId} • ${tx.employee.department}</div>
                     </td>
                     <td class="py-3.5 px-4">
                         <div class="text-xs text-slate-700 font-medium">${tx.items.length} รายการ: <span class="font-normal text-slate-500">${tx.items.map(i => `${i.id} (${i.brand} ${i.model})`).join(', ')}</span></div>
