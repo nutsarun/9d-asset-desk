@@ -181,6 +181,10 @@
                         <p class="text-sm text-slate-500 mt-1">กรุณาลงชื่อเข้าใช้ด้วยบัญชี Microsoft ขององค์กรเพื่อเข้าถึงฐานข้อมูลทรัพย์สิน</p>
                     </div>
 
+                    <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer rounded-lg bg-blue-50/70 border border-blue-100 p-3">
+                        <input id="nine-remember-login" type="checkbox" class="mt-1 h-4 w-4 accent-blue-600">
+                        <span><b>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</b><small class="block text-xs text-slate-500 mt-1">ใช้งานกับอุปกรณ์ส่วนตัวเท่านั้น · Microsoft 365 อาจขอเข้าสู่ระบบใหม่ตามนโยบายบริษัท</small></span>
+                    </label>
                     <!-- Primary Microsoft Sign-In Button -->
                     <div class="space-y-3">
                         <button onclick="initiateMicrosoftLogin()" class="w-full py-3.5 px-5 bg-[#2F2F2F] hover:bg-[#1a1a1a] active:scale-[0.99] text-white font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-3 cursor-pointer">
@@ -1441,6 +1445,8 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                     currentUser = null;
                     checkoutCart = [];
                     localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+                    window.nineEndSession?.();
+                    const remember=document.getElementById('nine-remember-login');if(remember)remember.checked=false;
                     showLoginScreen();
                     showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
                 }
@@ -2559,6 +2565,9 @@ function secureInitApp(){
  assets=[];transactions=[];showLoginScreen();
  const hint=document.createElement('p'); hint.className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3';hint.textContent='ตั้งค่า Microsoft Entra แล้ว กรุณาเข้าสู่ระบบด้วยบัญชีบริษัท';
  document.querySelector('#login-screen .max-w-md')?.appendChild(hint);
+ const remember=document.getElementById('nine-remember-login');if(remember)remember.checked=localStorage.getItem('nine-remember-microsoft-login')==='yes';
+ // DOMContentLoaded already finished setup of the login view. Attempt silent MSAL restore only on opt-in.
+ queueMicrotask(()=>window.nineRestoreMicrosoftSession?.());
 }
 quickDemoLogin=()=>showToast('ปิด Demo Login เพื่อความปลอดภัย กรุณาเข้าสู่ระบบด้วย Microsoft 365 จริง','error');
 runSimulatedOAuthFlow=()=>showToast('ไม่อนุญาตให้จำลองบัญชี Microsoft','error');
@@ -2606,32 +2615,72 @@ async function ensureMsalLoaded(){
  }
  throw new Error('ไม่สามารถโหลด Microsoft Login Library ได้ กรุณาตรวจสอบการบล็อก CDN ในเครือข่าย');
 }
+// Explicit opt-in: persistent MSAL token cache is enabled only on a trusted device.
+const NINE_REMEMBER_KEY='nine-remember-microsoft-login';
+function nineRememberLogin(){return localStorage.getItem(NINE_REMEMBER_KEY)==='yes';}
+async function nineNewMsalClient(){
+ const lib=await ensureMsalLoaded();
+ const client=new lib.PublicClientApplication({
+  auth:{clientId:ssoConfig.clientId,authority:'https://login.microsoftonline.com/'+ssoConfig.tenantId,redirectUri:location.origin+location.pathname},
+  cache:{cacheLocation:nineRememberLogin()?'localStorage':'sessionStorage'}
+ });
+ if(client.initialize)await client.initialize();
+ return client;
+}
+async function nineCompleteGraphLogin(auth,client,{quiet=false}={}){
+ const email=String(auth.account?.username||'').toLowerCase();
+ if(!email.endsWith('@ninedistribution.com'))throw Error('อนุญาตเฉพาะบัญชี @ninedistribution.com');
+ window.nineGraphAuth={client,account:auth.account};
+ localStorage.setItem('nine-remembered-user-email',email);
+ // Never restore a role from browser storage; derive it and load the portal ACL afresh.
+ await window.nineMaster?.chooseListForLogin();
+ const all=[];
+ for(const list of NINE_GRAPH.lists)all.push(...await readGraphList(auth.accessToken,list));
+ assets=all;transactions=[];nineSharepointLoaded=true;checkoutCart=[];
+ const isAdmin=['nutsarun@ninedistribution.com','satit@ninedistribution.com'].includes(email);
+ completeMicrosoftSignIn({name:auth.account.name||email,email,role:isAdmin?'admin':'viewer',roleLabel:isAdmin?'Super Admin':'Viewer (SharePoint)',department:'Nine Distribution',initials:(auth.account.name||email).slice(0,2).toUpperCase()});
+ await window.nineAfterLogin();
+ // The role loader may have denied this account.
+ if(!currentUser)throw Error('บัญชีนี้ไม่ได้รับอนุญาตให้ใช้งานระบบ');
+ window.nineMaster?.buildMenu();
+ document.getElementById('nav-master')?.classList.toggle('hidden',!isAdmin);
+ window.nineUpgradeAfterLogin?.();
+ showToast('เชื่อมต่อ SharePoint สำเร็จ · โหลดทรัพย์สิน '+all.length+' รายการ','success');
+}
 initiateMicrosoftLogin=async function(){
  if(!ssoConfig.clientId||!ssoConfig.tenantId||ssoConfig.tenantId==='common'){
-  showToast('ต้องใส่ Client ID และ Tenant ID ของบริษัทก่อน', 'error');openSsoSetupModal(true);return;
+  showToast('ต้องใส่ Client ID และ Tenant ID ของบริษัทก่อน','error');openSsoSetupModal(true);return;
  }
+ const input=document.getElementById('nine-remember-login');
+ localStorage.setItem(NINE_REMEMBER_KEY,input?.checked?'yes':'no');
  try{
-  const msalLib=await ensureMsalLoaded();
-  const client=new msalLib.PublicClientApplication({auth:{clientId:ssoConfig.clientId,authority:'https://login.microsoftonline.com/'+ssoConfig.tenantId,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'sessionStorage'}});
-  if(client.initialize)await client.initialize();
+  const client=await nineNewMsalClient();
   const auth=await client.loginPopup({scopes:['User.Read','Sites.Read.All'],prompt:'select_account'});
-  window.nineGraphAuth={client,account:auth.account};
-  const email=String(auth.account.username||'').toLowerCase();
-  if(!email.endsWith('@ninedistribution.com'))throw Error('อนุญาตเฉพาะบัญชี @ninedistribution.com');
-  await window.nineMaster?.chooseListForLogin();
-  let all=[];
-  for(const list of NINE_GRAPH.lists)all.push(...await readGraphList(auth.accessToken,list));
-  assets=all;transactions=[];nineSharepointLoaded=true;checkoutCart=[];
-  const isAdmin=['nutsarun@ninedistribution.com','satit@ninedistribution.com'].includes(email);
-  completeMicrosoftSignIn({name:auth.account.name||email,email,role:isAdmin?'admin':'viewer',roleLabel:isAdmin?'Super Admin':'Viewer (SharePoint)',department:'Nine Distribution',initials:(auth.account.name||email).slice(0,2).toUpperCase()});
-  await window.nineAfterLogin();
-  window.nineMaster?.buildMenu();
-  document.getElementById('nav-master')?.classList.toggle('hidden',!isAdmin);
-  window.nineUpgradeAfterLogin?.();
-  // Connection status is informational, not a persistent page banner.
-  // Reuse the existing auto-dismiss toast (3.5 seconds) instead.
-  showToast('เชื่อมต่อ SharePoint สำเร็จ · โหลดทรัพย์สิน '+all.length+' รายการ','success');
+  await nineCompleteGraphLogin(auth,client);
  }catch(err){showToast('Microsoft / SharePoint: '+(err?.message||err),'error');}
+};
+window.nineRestoreMicrosoftSession=async function(){
+ if(!nineRememberLogin()||!ssoConfig?.clientId)return;
+ try{
+  const client=await nineNewMsalClient(),accounts=client.getAllAccounts();
+  if(!accounts.length)return;
+  const username=localStorage.getItem('nine-remembered-user-email');
+  const account=accounts.find(a=>a.username.toLowerCase()===username)||accounts.find(a=>a.username.toLowerCase().endsWith('@ninedistribution.com'));
+  if(!account)return;
+  const auth=await client.acquireTokenSilent({scopes:['User.Read','Sites.Read.All'],account});
+  await nineCompleteGraphLogin({...auth,account},client,{quiet:true});
+ }catch(err){
+  // Never open a login popup automatically: Safari and tenant policies may require user interaction.
+  console.info('Silent Microsoft session restore unavailable:',err?.message||err);
+  window.nineGraphAuth=null;
+  currentUser=null;assets=[];nineSharepointLoaded=false;showLoginScreen();
+ }
+};
+window.nineEndSession=()=>{
+ localStorage.removeItem('nine-remembered-user-email');
+ localStorage.setItem(NINE_REMEMBER_KEY,'no');
+ window.nineGraphAuth=null;
+ // Active login has ended. Next visit requires a new user-initiated sign-in.
 };
 </script>
 
