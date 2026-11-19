@@ -140,6 +140,25 @@ async function refreshAssetData(){
  for(const list of NINE_GRAPH.lists)all.push(...await readGraphList(await readToken(),list));
  assets=all;enrich();renderAll();
 }
+// Refresh live SharePoint assets, custodians, financial data and staff directory.
+window.nineRefreshDashboard=async function(){
+ const btn=document.getElementById('nine-dashboard-refresh');
+ if(btn?.disabled)return;
+ if(btn){btn.disabled=true;btn.classList.add('opacity-60','cursor-wait');}
+ try{
+  if(!window.nineGraphAuth)throw Error('กรุณาเข้าสู่ระบบ Microsoft ก่อน');
+  await refreshAssetData();
+  await loadDirectory();
+  // This triggers all existing Dashboard wrappers, including valuation and holders.
+  renderAll();
+  window.nineEmployeeSummary?.draw?.();
+  window.nineAnnualV2?.render?.();
+  const stamp=document.getElementById('nine-refresh-stamp');
+  if(stamp)stamp.textContent='อัปเดตล่าสุด: '+new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  showToast('รีเฟรชข้อมูลทรัพย์สินและพนักงานจาก SharePoint สำเร็จ','success');
+ }catch(e){showToast('รีเฟรชไม่สำเร็จ: '+(e?.message||e),'error');}
+ finally{if(btn){btn.disabled=false;btn.classList.remove('opacity-60','cursor-wait');}}
+};
 async function readToken(){
  const a=window.nineGraphAuth;
  try{return (await a.client.acquireTokenSilent({account:a.account,scopes:['Sites.Read.All']})).accessToken;}
