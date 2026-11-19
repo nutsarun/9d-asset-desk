@@ -762,24 +762,8 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[1380px] text-left border-collapse table-auto">
-                            <thead>
-                                <tr class="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
-                                    <th class="py-3.5 px-4">เลขที่เอกสาร</th>
-                                    <th class="py-3.5 px-4">ประเภทธุรกรรม</th>
-                                    <th class="py-3.5 px-4">วันที่ทำรายการ</th>
-                                    <th class="py-3.5 px-4 min-w-[255px]">พนักงาน (รหัส / แผนก)</th>
-                                    <th class="py-3.5 px-4 min-w-[275px]">รายการอุปกรณ์ & ผู้ดำเนินการ</th>
-                                    <th class="py-3.5 px-4 min-w-[375px] text-right">พิมพ์เอกสาร</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-tbody" class="divide-y divide-slate-100 text-sm">
-                                <!-- Rendered via JS -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div id="history-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4 min-w-0" aria-live="polite">
+                    <!-- Responsive document cards populated by renderHistory -->
                 </div>
             </section>
 
@@ -2321,49 +2305,63 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
         function renderHistory() {
             const typeFilter = document.getElementById('hist-filter-type').value;
             const search = document.getElementById('hist-search').value.toLowerCase().trim();
-
+            const safe = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const filtered = transactions.filter(tx => {
                 const matchType = typeFilter === 'ALL' || tx.type === typeFilter;
-                const itemsStr = tx.items.map(i => `${i.id} ${i.brand} ${i.model} ${i.serial}`).join(' ');
-                const haystack = `${tx.docNo} ${tx.employee.name} ${tx.employee.empId} ${tx.employee.department} ${itemsStr}`.toLowerCase();
+                const rows = Array.isArray(tx.items) ? tx.items : [];
+                const itemText = rows.map(i => [i.id,i.brand,i.model,i.serial].join(' ')).join(' ');
+                const employee = tx.employee || {};
+                const haystack = [tx.docNo, employee.name, employee.empId, employee.department, itemText].join(' ').toLowerCase();
                 return matchType && haystack.includes(search);
             });
-
-            const tbody = document.getElementById('history-tbody');
-            if (!filtered.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-400">ไม่พบประวัติธุรกรรมที่ค้นหา</td></tr>`;
+            const root = document.getElementById('history-list');
+            if(!root)return;
+            if(!filtered.length){
+                root.innerHTML = '<div class="xl:col-span-2 bg-white rounded-xl border px-5 py-10 text-center text-slate-500">ไม่พบประวัติธุรกรรมที่ค้นหา</div>';
                 return;
             }
-
-            tbody.innerHTML = filtered.map(tx => `
-                <tr class="hover:bg-slate-50/90">
-                    <td class="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">${tx.docNo}</td>
-                    <td class="py-3.5 px-4 whitespace-nowrap">
-                        ${tx.type === 'CHECKOUT' 
-                            ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">ใบรับมอบ (Check-Out)</span>' 
-                            : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">ใบตรวจรับคืน (Check-In)</span>'}
-                    </td>
-                    <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">${formatThaiDate(tx.date)}</td>
-                    <td class="py-3.5 px-4 min-w-[255px] align-middle">
-                        <div class="font-semibold text-slate-900 whitespace-nowrap">${tx.employee.name}</div>
-                        <div class="text-xs text-slate-500 whitespace-nowrap mt-1">${tx.employee.empId} • ${tx.employee.department}</div>
-                    </td>
-                    <td class="py-3.5 px-4">
-                        <div class="text-xs text-slate-700 font-medium">${tx.items.length} รายการ: <span class="font-normal text-slate-500">${tx.items.map(i => `${i.id} (${i.brand} ${i.model})`).join(', ')}</span></div>
-                        <div class="text-[11px] text-brand-600 mt-0.5">ผู้ดำเนินการ: ${tx.officerName || 'เจ้าหน้าที่ฝ่ายไอที'}</div>
-                    </td>
-                    <td class="py-3.5 px-4 text-right whitespace-nowrap">
-                        <button onclick="openPrintDocument('${tx.docNo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-brand-600 text-white text-xs font-medium rounded-lg shadow-2xs transition-colors">
-                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                            <span>ดู / พิมพ์เอกสาร</span>
-                        </button>
-                        ${tx.pdfStatus === 'saved' && tx.pdfUrl
-                            ? `<a href="${tx.pdfUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">เปิด PDF ใน SharePoint</a><button type="button" onclick="window.nineRepairArchive('${tx.docNo}')" class="ml-2 inline-flex items-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700" title="สร้าง PDF ใหม่เพื่อแทนที่ไฟล์เปล่า โดยไม่ส่งมอบซ้ำ">ซ่อม PDF</button>`
-                            : `<button type="button" onclick="window.nineRetryArchive('${tx.docNo}')" class="ml-2 inline-flex items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700">${tx.pdfStatus === 'saving' ? 'กำลังบันทึก PDF...' : 'บันทึก PDF ไป SharePoint'}</button>`}
-                    </td>
-                </tr>
-            `).join('');
-            lucide.createIcons();
+            root.innerHTML = filtered.map(tx => {
+                const employee = tx.employee || {};
+                const rows = Array.isArray(tx.items) ? tx.items : [];
+                const isHandover = tx.type === 'CHECKOUT';
+                const badge = isHandover
+                  ? '<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">ใบรับมอบ (Check-Out)</span>'
+                  : '<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">ใบตรวจรับคืน (Check-In)</span>';
+                const items = rows.length ? rows.map(a=>'<li class="flex flex-wrap gap-x-1 text-xs leading-relaxed text-slate-700 break-words"><b class="text-slate-900">'+safe(a.id)+'</b><span>'+safe([a.brand,a.model].filter(Boolean).join(' ') || a.category || '-')+'</span>'+(a.serial?'<span class="text-slate-500">(S/N: '+safe(a.serial)+')</span>':'')+'</li>').join('') :
+                    '<li class="text-xs text-slate-500">ไม่มีรายการอุปกรณ์</li>';
+                const validLink = typeof tx.pdfUrl === 'string' && /^https:\/\/ninedistribution\.sharepoint\.com\//i.test(tx.pdfUrl);
+                const actions = tx.pdfStatus === 'saved' && validLink
+                    ? '<a href="'+safe(tx.pdfUrl)+'" target="_blank" rel="noopener noreferrer" class="inline-flex justify-center items-center rounded-lg px-3 py-2 text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-800">เปิด PDF ใน SharePoint</a>'+
+                      '<button type="button" data-history-action="repair" class="inline-flex justify-center items-center rounded-lg px-3 py-2 text-xs font-semibold border border-amber-200 bg-white text-amber-800">ซ่อม PDF</button>'
+                    : '<button type="button" data-history-action="retry" class="inline-flex justify-center items-center rounded-lg px-3 py-2 text-xs font-semibold border border-blue-200 bg-white text-blue-700">'+(tx.pdfStatus==='saving'?'กำลังบันทึก PDF...':'บันทึก PDF ไป SharePoint')+'</button>';
+                return '<article class="history-document-card min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden" data-history-doc="'+safe(tx.docNo)+'">'+
+                 '<div class="flex flex-wrap items-center justify-between gap-2 p-4 border-b bg-slate-50/70">'+
+                   '<div class="min-w-0 flex flex-wrap items-center gap-2"><span class="font-bold text-sm text-slate-900 break-all">'+safe(tx.docNo)+'</span>'+badge+'</div>'+
+                   '<span class="text-xs text-slate-500 whitespace-nowrap">'+safe(formatThaiDate(tx.date))+'</span>'+
+                 '</div>'+
+                 '<div class="p-4 space-y-4">'+
+                   '<section class="min-w-0"><div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">พนักงานผู้ถือครอง</div>'+
+                     '<div class="text-sm font-semibold text-slate-900 break-words leading-relaxed">'+safe(employee.name||'-')+'</div>'+
+                     '<div class="text-xs text-slate-500 mt-1 break-words">รหัส: '+safe(employee.empId||'-')+' · แผนก: '+safe(employee.department||'-')+'</div>'+
+                   '</section>'+
+                   '<section class="min-w-0 border-t pt-3"><div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">รายการอุปกรณ์ ('+rows.length+')</div>'+
+                     '<ul class="space-y-1.5">'+items+'</ul>'+
+                     '<div class="text-xs text-blue-700 mt-3 break-words">ผู้ดำเนินการ: '+safe(tx.officerName||'เจ้าหน้าที่ฝ่ายไอที')+'</div>'+
+                   '</section>'+
+                 '</div>'+
+                 '<div class="flex flex-wrap gap-2 border-t bg-slate-50/40 px-4 py-3">'+
+                   '<button type="button" data-history-action="print" class="inline-flex justify-center items-center rounded-lg bg-slate-900 hover:bg-blue-700 text-white px-3 py-2 text-xs font-semibold">ดู / พิมพ์เอกสาร</button>'+actions+
+                 '</div></article>';
+            }).join('');
+            root.querySelectorAll('[data-history-action]').forEach(button=>{
+                button.addEventListener('click',()=>{
+                    const doc=button.closest('[data-history-doc]')?.dataset.historyDoc;
+                    if(!doc)return;
+                    if(button.dataset.historyAction==='print')openPrintDocument(doc);
+                    else if(button.dataset.historyAction==='repair')window.nineRepairArchive?.(doc);
+                    else if(button.dataset.historyAction==='retry')window.nineRetryArchive?.(doc);
+                });
+            });
         }
 
         function openPrintDocument(docNo) {
