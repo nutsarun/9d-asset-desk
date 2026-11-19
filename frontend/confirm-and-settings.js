@@ -96,7 +96,7 @@
    {key:'general',title:text('ภาษาและการแสดงผล','Language & Display'),info:text('ภาษาไทย / English','Thai / English'),icon:'languages'},
    {key:'sso',title:'Microsoft SSO',info:text('ตั้งค่าการเข้าสู่ระบบ Microsoft 365','Microsoft 365 sign-in settings'),icon:'shield-check',privileged:true},
    {key:'users',title:text('จัดการผู้ใช้งาน','User Management'),info:text('บัญชีผู้ใช้และสิทธิ์การเข้าถึง','Accounts and access roles'),icon:'users',privileged:true},
-   {key:'master',title:text('รวมข้อมูล SharePoint','SharePoint Data Migration'),info:text('Master Asset Inventory','Master Asset Inventory'),icon:'database',privileged:true}
+   {key:'master',title:text('สำรองและกู้คืนข้อมูล','Database Backup & Restore'),info:text('สำรอง Master Asset Inventory','Master Asset Inventory snapshots'),icon:'database-backup',privileged:true}
   ];
   for(const a of actions){
    const b=document.createElement('button');b.type='button';b.dataset.settingsTab=a.key;
