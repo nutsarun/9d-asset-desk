@@ -2357,6 +2357,9 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                             <i data-lucide="printer" class="w-3.5 h-3.5"></i>
                             <span>ดู / พิมพ์เอกสาร</span>
                         </button>
+                        ${tx.pdfStatus === 'saved' && tx.pdfUrl
+                            ? `<a href="${tx.pdfUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">เปิด PDF ใน SharePoint</a>`
+                            : `<button type="button" onclick="window.nineRetryArchive('${tx.docNo}')" class="ml-2 inline-flex items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700">${tx.pdfStatus === 'saving' ? 'กำลังบันทึก PDF...' : 'บันทึก PDF ไป SharePoint'}</button>`}
                     </td>
                 </tr>
             `).join('');
@@ -2699,6 +2702,7 @@ window.nineEndSession=()=>{
 <script src="./asset-value-import.js"></script>
 <script src="./portal-settings.js"></script>
 <script src="./handover-forms.js"></script>
+<script src="./document-archive.js"></script>
 <script src="./confirm-and-settings.js"></script>
 </body>
 </html>
