@@ -303,12 +303,15 @@ function setup(){
  if($('tab-portal-users'))return;
  const nav=document.querySelector('#sidebar nav'),main=document.querySelector('#app-shell main');
  if(!nav||!main)return;
- const link=(id,title,tab)=>{
+ const link=(id,title,tab,icon)=>{
   const b=document.createElement('button');b.id=id;b.dataset.tab=tab;
   b.className='nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium hover:bg-slate-800 hover:text-white text-slate-300';
-  b.textContent=title;b.onclick=()=>switchTab(tab);nav.append(b);
+  const glyph=document.createElement('i');glyph.dataset.lucide=icon;glyph.className='w-5 h-5 shrink-0';
+  const caption=document.createElement('span');caption.textContent=title;
+  b.append(glyph,caption);b.onclick=()=>switchTab(tab);nav.append(b);
  };
- link('nav-settings','ตั้งค่าระบบ','settings');link('nav-portal-users','จัดการผู้ใช้งาน','portal-users');
+ link('nav-settings','ตั้งค่าระบบ','settings','settings');
+ link('nav-portal-users','จัดการผู้ใช้งาน','portal-users','users');
  const sec=document.createElement('section');sec.id='tab-settings';sec.className='tab-content hidden bg-white rounded-2xl border p-5 space-y-4';
  sec.innerHTML='<h2 class="font-bold text-2xl">ตั้งค่าระบบ (Settings)</h2><div class="max-w-md space-y-2"><label class="block font-semibold">ภาษาเว็บไซต์ (Website Language)</label><select id="portal-language" data-language-select class="w-full border rounded-xl p-3"><option value="th">🇹🇭 ภาษาไทย</option><option value="en">🇬🇧 English</option></select><p class="text-xs text-slate-500">การเลือกภาษาจะจดจำในเบราว์เซอร์นี้และไม่เปลี่ยนข้อมูลใน SharePoint</p></div>';
  const usersTab=document.createElement('section');usersTab.id='tab-portal-users';usersTab.className='tab-content hidden bg-white rounded-2xl border p-5 space-y-4';
@@ -320,6 +323,7 @@ function setup(){
  $('portal-user-form').onsubmit=saveUser;
  $('portal-allowlist').onchange=e=>toggleRestriction(e.target.checked);
  renderUsers();updateMenus();schedule();
+ window.lucide?.createIcons();
  const obs=new MutationObserver(schedule);obs.observe(main,{subtree:true,childList:true,characterData:true});
 }
 const oldHook=window.nineAfterLogin;
