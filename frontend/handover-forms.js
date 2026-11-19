@@ -44,6 +44,7 @@ function paper(tx){
  }
  return result;
 }
+window.nineRenderHandoverPaper=function(tx){style();return '<div class="ho-paper">'+paper(tx)+'</div>';};
 openPrintDocument=function(docNo){
  const tx=transactions.find(x=>x.docNo===docNo);
  if(!tx||!['CHECKOUT','CHECKIN'].includes(tx.type))return showToast('ไม่พบเอกสาร','error');
