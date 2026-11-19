@@ -1698,6 +1698,10 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
             `).join('') : `<tr><td colspan="6" class="py-6 text-center text-slate-400">ยังไม่มีประวัติธุรกรรม</td></tr>`;
             document.getElementById('dashboard-recent-tx').innerHTML = recentHtml;
 
+            // Currency values are pulled from SharePoint AssetValue; missing is not zero.
+            const custodianHasValue = a => a.assetValue !== null && a.assetValue !== undefined && a.assetValue !== '' && Number.isFinite(Number(a.assetValue)) && Number(a.assetValue) >= 0;
+            const custodianMoney = value => Number(value).toLocaleString('th-TH', {minimumFractionDigits:2,maximumFractionDigits:2});
+
             // Active Holders
             const holdersMap = groupAssignedAssetsByEmployee();
             const holderKeys = Object.keys(holdersMap);
@@ -1705,6 +1709,9 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
 
             const holdersHtml = holderKeys.length ? holderKeys.map(key => {
                 const group = holdersMap[key];
+                const knownAssets = group.items.filter(custodianHasValue);
+                const totalValue = knownAssets.reduce((sum, item) => sum + Number(item.assetValue), 0);
+                const missingCount = group.items.length - knownAssets.length;
                 return `
                     <div class="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all">
                         <div class="flex items-start justify-between gap-2 mb-2">
@@ -1714,11 +1721,19 @@ const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });<
                             </div>
                             <span class="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs font-bold rounded-lg">${group.items.length} ชิ้น</span>
                         </div>
+                        <div class="mt-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100 flex flex-wrap items-baseline justify-between gap-1">
+                            <span class="text-xs text-slate-600">มูลค่าทรัพย์สินที่ครอบครอง</span>
+                            <span class="font-bold text-blue-800 text-sm">฿${custodianMoney(totalValue)}</span>
+                            ${missingCount ? `<span class="text-[10px] text-amber-700 w-full">ยังไม่ระบุมูลค่า ${missingCount} รายการ — ยอดรวมเฉพาะรายการที่มีข้อมูล</span>` : ''}
+                        </div>
                         <ul class="space-y-1 mt-3 pt-2.5 border-t border-slate-200/70">
                             ${group.items.map(item => `
                                 <li class="text-xs text-slate-600 flex items-center justify-between">
                                     <span class="truncate pr-2"><strong class="font-mono text-slate-800">${item.id}</strong> ${item.brand} ${item.model}</span>
-                                    <span class="text-[11px] text-slate-400 shrink-0">${formatThaiDate(item.assignedTo.assignedDate)}</span>
+                                    <span class="text-right shrink-0 flex flex-col gap-0.5">
+                                        <span class="text-[11px] font-semibold ${custodianHasValue(item) ? 'text-blue-700' : 'text-amber-700'}">${custodianHasValue(item) ? '฿' + custodianMoney(item.assetValue) : 'ยังไม่ระบุ'}</span>
+                                        <span class="text-[10px] text-slate-400">${formatThaiDate(item.assignedTo.assignedDate)}</span>
+                                    </span>
                                 </li>
                             `).join('')}
                         </ul>
