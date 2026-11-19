@@ -70,6 +70,89 @@ async function loadDirectory(){
  directory=[...merged.values()].sort((a,b)=>a.name.localeCompare(b.name,'th'));
  enrich();renderEmployees();populateEmployeePresets();
 }
+// One-time administrator setup: central employee directory in the Inventory SharePoint site.
+// Nothing is created or uploaded until the Super Admin explicitly clicks and confirms.
+const employeeRootAdmin=()=>!!(window.nineGraphAuth&&currentUser&&ADMINS.has(String(currentUser.email).toLowerCase()));
+async function employeeGraphAdmin(url,method='GET',body=null,scope='Sites.Read.All'){
+ const auth=window.nineGraphAuth;
+ if(!employeeRootAdmin()||!auth)throw Error('เฉพาะ Super Admin ของบริษัทเท่านั้น');
+ const request={account:auth.account,scopes:[scope]};
+ let token;
+ try{token=(await auth.client.acquireTokenSilent(request)).accessToken}
+ catch{token=(await auth.client.acquireTokenPopup(request)).accessToken}
+ const headers={Authorization:'Bearer '+token};
+ if(body!==null)headers['Content-Type']='application/json';
+ const response=await fetch(url,{method,headers,body:body===null?undefined:JSON.stringify(body)});
+ if(!response.ok)throw Error('Microsoft Graph '+response.status+': '+(await response.text()).slice(0,260));
+ return response.status===204?null:response.json();
+}
+async function employeeGraphPages(url){
+ let out=[];
+ while(url){const result=await employeeGraphAdmin(url);out.push(...(result.value||[]));url=result['@odata.nextLink']}
+ return out;
+}
+let employeeSetupBusy=false;
+window.nineSetupEmployeeSharePoint=async function(){
+ if(employeeSetupBusy||!employeeRootAdmin())return showToast('เฉพาะ Super Admin เท่านั้น','error');
+ const base='https://graph.microsoft.com/v1.0/sites/'+SITE+'/lists';
+ // The directory in the browser is the only copy of local entries; never delete it here.
+ const seed=[...directory.filter(e=>e.name&&String(e.name).trim())];
+ const localSaved=(()=>{try{return JSON.parse(localStorage.getItem('nine-employee-local-v2')||'[]')}catch{return[]}})();
+ const candidates=new Map();
+ for(const e of [...seed,...localSaved]){
+  if(!e?.name||!norm(e.name))continue;
+  const k=norm(e.name);
+  const old=candidates.get(k)||{};
+  // Persist the better populated entry, without losing values from either source.
+  const obj={...old};for(const key of ['name','empId','department','position','email','contact','company'])
+   if(String(e[key]||'').trim())obj[key]=String(e[key]).trim();
+  candidates.set(k,obj);
+ }
+ if(!confirm('ต้องการสร้าง/เชื่อมฐานข้อมูล "'+EMP_LIST_NAME+'" ใน SharePoint และนำเข้ารายชื่อพนักงานที่มีอยู่ในเบราว์เซอร์นี้ '+candidates.size+' คนหรือไม่?\n\nข้อมูลพนักงานที่อยู่ในเบราว์เซอร์เครื่องอื่นจะไม่ถูกนำเข้าจนกว่าจะซิงค์จากเครื่องนั้นเพิ่มเติม'))return;
+ employeeSetupBusy=true;
+ const btn=document.getElementById('emp-setup-sync');
+ if(btn){btn.disabled=true;btn.textContent='กำลังตั้งค่า SharePoint...'}
+ let added=0,failed=[];
+ try{
+  const lists=await employeeGraphPages(base+'?$top=100');
+  let existing=lists.find(x=>x.displayName===EMP_LIST_NAME);
+  if(!existing){
+   existing=await employeeGraphAdmin(base,'POST',{displayName:EMP_LIST_NAME,list:{template:'genericList'},description:'Employee directory for 9D IT Asset Pro; managed by Microsoft 365 admins.'},'Sites.Manage.All');
+  }
+  employeeListId=existing.id;
+  const columns=await employeeGraphPages(base+'/'+employeeListId+'/columns?$top=100');
+  for(const col of ['EmployeeCode','Department','Position','Email','Contact','Company']){
+   if(!columns.some(x=>x.name===col)){
+    await employeeGraphAdmin(base+'/'+employeeListId+'/columns','POST',{name:col,text:{}},'Sites.Manage.All');
+   }
+  }
+  const remote=await employeeGraphPages(base+'/'+employeeListId+'/items?$top=100&$expand=fields');
+  const found=new Set(remote.map(r=>norm(r.fields?.Title)));
+  for(const e of candidates.values()){
+   if(found.has(norm(e.name)))continue; // never overwrite an existing shared employee record
+   try{
+    await employeeGraphAdmin(base+'/'+employeeListId+'/items','POST',{fields:{
+     Title:e.name,EmployeeCode:e.empId||'',Department:e.department||'',Position:e.position||'',
+     Email:e.email||'',Contact:e.contact||'',Company:e.company||'Nine distribution co.,ltd'
+    }},'Sites.ReadWrite.All');
+    found.add(norm(e.name));added++;
+   }catch(err){failed.push(e.name+': '+err.message)}
+  }
+  await loadDirectory();
+  renderEmployees();
+  if(failed.length){
+   showToast('เชื่อมฐานข้อมูลพนักงานแล้ว แต่นำเข้าไม่ครบ '+added+' คน; ตรวจสอบสิทธิ์และลองอีกครั้ง','error');
+   const src=document.getElementById('emp-source');
+   if(src)src.title=failed.slice(0,5).join('\n');
+  }else showToast('เชื่อม SharePoint Employee Directory แล้ว · เพิ่ม '+added+' คน','success');
+ }catch(err){
+  showToast('ตั้งค่า Employee Directory ไม่สำเร็จ: '+err.message,'error');
+  await loadDirectory().catch(()=>renderEmployees());
+ }finally{
+  employeeSetupBusy=false;
+  if(btn){btn.disabled=false;btn.textContent='สร้าง/ซิงค์ทะเบียนพนักงาน SharePoint'}
+ }
+};
 function ensurePanel(){
  const nav=document.querySelector('#sidebar nav');
  if(!nav||document.getElementById('nav-employees'))return;
@@ -87,7 +170,17 @@ function renderEmployees(){
  document.getElementById('emp-add').hidden=!isAdmin;
  const src=document.getElementById('emp-source');
  src.className='rounded-xl p-3 border text-sm '+(employeeListId?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900');
- src.textContent=employeeListId?'ข้อมูลพนักงานเชื่อมกับ SharePoint List: '+EMP_LIST_NAME:'ยังไม่มี SharePoint List "'+EMP_LIST_NAME+'" — ข้อมูลพนักงานที่เพิ่ม/แก้ไขจะเก็บเฉพาะเบราว์เซอร์นี้ ไม่แชร์กับผู้อื่น กรุณาสร้าง List ตามคู่มือใน GitHub เพื่อเปิดการซิงก์';
+ src.innerHTML='';
+ const message=document.createElement('span');
+ message.textContent=employeeListId?'เชื่อมต่อทะเบียนพนักงาน SharePoint: '+EMP_LIST_NAME+' สำเร็จ':'ยังไม่มี SharePoint List "'+EMP_LIST_NAME+'" — ข้อมูลที่เพิ่ม/แก้ไขจะเก็บในเบราว์เซอร์นี้เท่านั้น หากต้องการให้ใช้ร่วมกันทั้งองค์กร ให้ Super Admin สร้างและซิงค์ทะเบียนพนักงาน';
+ src.append(message);
+ if(employeeRootAdmin()){
+  const button=document.createElement('button');button.id='emp-setup-sync';button.type='button';
+  button.className='ml-3 mt-2 sm:mt-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-current bg-white/70 hover:bg-white';
+  button.textContent=employeeListId?'ซิงค์รายชื่อจากเบราว์เซอร์':'สร้าง/ซิงค์ทะเบียนพนักงาน SharePoint';
+  button.disabled=employeeSetupBusy;button.onclick=window.nineSetupEmployeeSharePoint;
+  src.append(button);
+ }
  const query=norm(document.getElementById('emp-search')?.value);
  const sortBy=document.getElementById('emp-sort')?.value||'name';
  const filtered=directory.map((e,i)=>({...e,_index:i}))
