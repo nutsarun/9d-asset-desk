@@ -51,7 +51,7 @@ function draw(){
  const master=NINE_GRAPH.lists.length===1 && NINE_GRAPH.lists[0].kind==="master";
  const groups=[
   {id:"all",name:"มูลค่าทรัพย์สินรวม",hint:"ทุกสถานะ รวมที่เบิกใช้งานและส่งซ่อม",items:assets,color:"slate"},
-  {id:"available",name:"มูลค่าพร้อมใช้งาน",hint:"สถานะพร้อมใช้งาน (Available)",items:assets.filter(a=>a.status==="available"),color:"emerald"},
+  {id:"active",name:"มูลค่าทรัพย์สินที่ยังไม่ปลดระวาง",hint:"รวมอุปกรณ์ในคลัง ที่พนักงานใช้งาน และส่งซ่อม",items:assets.filter(a=>a.status!=="retired"),color:"emerald"},
   {id:"retired",name:"มูลค่าปลดระวาง",hint:"รวม Retired, Not available และ Lost ตามการจัดสถานะปัจจุบัน",items:assets.filter(a=>a.status==="retired"),color:"amber"}
  ].map(g=>({
   ...g,value:g.items.filter(valid).reduce((sum,a)=>sum+Number(a.assetValue),0),
