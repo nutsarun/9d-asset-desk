@@ -64,9 +64,9 @@ function draw(){
   '<div class="text-sm font-semibold text-slate-600">'+g.name+'</div>'+
   '<div class="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tabular-nums">฿'+money(g.value)+'</div>'+
   '<div class="text-xs text-slate-600 mt-2">'+g.items.length+' รายการ · ระบุมูลค่า '+g.known+(g.missing?' · <span class="text-amber-700">ไม่ระบุ '+g.missing+'</span>':'')+'</div>'+
-  '<div class="text-xs text-blue-700 font-semibold mt-2">คลิกดูรายการอุปกรณ์</div></button>';
+  '<div class="text-xs text-slate-500 mt-1">'+g.hint+'</div><div class="text-xs text-blue-700 font-semibold mt-2">คลิกดูรายการอุปกรณ์</div></button>';
  const details=current.items.length?current.items.map(a=>
-  '<tr class="border-t"><td class="p-2 font-mono font-semibold">'+escaped(a.id)+'</td><td class="p-2">'+escaped(a.assetType||a.category)+'</td><td class="p-2">'+escaped(a.brand)+' '+escaped(a.model)+'</td><td class="p-2">'+escaped(a.status)+'</td><td class="p-2 text-right whitespace-nowrap">'+(valid(a)?'฿'+money(a.assetValue):'<span class="text-amber-700">ยังไม่ระบุ</span>')+'</td></tr>').join(''):
+  '<tr class="border-t"><td class="p-2 font-mono font-semibold">'+escaped(a.id)+'</td><td class="p-2">'+escaped(a.assetType||a.category)+'</td><td class="p-2">'+escaped(a.brand)+' '+escaped(a.model)+'</td><td class="p-2">'+escaped(a._sp?.rawStatus||a.status)+'</td><td class="p-2 text-right whitespace-nowrap">'+(valid(a)?'฿'+money(a.assetValue):'<span class="text-amber-700">ยังไม่ระบุ</span>')+'</td></tr>').join(''):
   '<tr><td colspan="5" class="p-5 text-center text-slate-500">ไม่มีทรัพย์สินในสถานะนี้</td></tr>';
  card.innerHTML='<div class="flex flex-wrap justify-between gap-3 items-center mb-4"><div><h3 class="text-lg font-bold text-slate-800">สรุปมูลค่าทรัพย์สินตามสถานะ</h3><p class="text-xs text-slate-500 mt-1">ข้อมูลจาก SharePoint Master Asset Inventory · มูลค่าตามที่บันทึก ไม่ใช่มูลค่าหลังหักค่าเสื่อม</p></div>'+
   (master&&admin()?'<button id="nine-prepare-value" class="border bg-white px-4 py-2 rounded-xl text-sm">เตรียมคอลัมน์มูลค่า / ซิงก์ Host name</button>':'')+'</div>'+
