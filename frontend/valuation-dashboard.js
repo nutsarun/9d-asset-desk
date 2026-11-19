@@ -8,7 +8,7 @@ const admin=()=>["nutsarun@ninedistribution.com","satit@ninedistribution.com"].i
 const escaped=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const valid=a=>a.assetValue!==null && a.assetValue!==undefined && Number.isFinite(Number(a.assetValue)) && Number(a.assetValue)>=0;
 const money=x=>Number(x).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
-let busy=false,expanded=false;
+let busy=false,expanded=false,selectedStatus='all';
 async function token(scope){
  const a=window.nineGraphAuth;if(!a)throw Error("กรุณาเข้าสู่ระบบ Microsoft ใหม่");
  const request={account:a.account,scopes:[scope]};
@@ -47,10 +47,37 @@ function addUI(){
 }
 function draw(){
  const card=document.getElementById("nine-valuation-card");if(!card)return;
- const data=valueRows(),total=data.reduce((n,g)=>n+g.total,0);
- const unknown=data.reduce((n,g)=>n+g.unknown,0),known=data.reduce((n,g)=>n+g.known,0);
+ const data=valueRows(),known=data.reduce((n,g)=>n+g.known,0),unknown=data.reduce((n,g)=>n+g.unknown,0);
  const master=NINE_GRAPH.lists.length===1 && NINE_GRAPH.lists[0].kind==="master";
- card.innerHTML='<div class="flex flex-wrap items-center justify-between gap-3"><div><div class="text-sm font-semibold text-slate-500">มูลค่าทรัพย์สินรวม (เฉพาะรายการที่มีข้อมูล)</div><div class="text-3xl font-bold text-slate-900">฿'+money(total)+'</div><div class="text-sm text-slate-500 mt-1">ระบุมูลค่าแล้ว '+known+' / '+assets.length+' รายการ'+(unknown?' · ยังไม่ระบุ '+unknown+' รายการ':'')+'</div></div><div class="flex gap-2 flex-wrap"><button id="nine-breakdown-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm">ดูมูลค่าแยกประเภท</button>'+(master&&admin()?'<button id="nine-prepare-value" class="border bg-white px-4 py-2 rounded-xl text-sm">เตรียมคอลัมน์มูลค่า / ซิงก์ Host name</button>':'')+'</div></div><div id="nine-breakdown" class="mt-4 '+(expanded?'':'hidden')+'">'+(unknown?'<div class="text-xs bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">ผลรวมไม่ใช่มูลค่าทรัพย์สินทั้งองค์กรจนกว่าจะกรอกมูลค่าครบทุกชิ้น (ข้อมูลว่างไม่นับเป็น 0 บาท)</div>':'')+'<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="p-2 text-left">หมวดหมู่</th><th class="p-2 text-right">จำนวน</th><th class="p-2 text-right">มีมูลค่า</th><th class="p-2 text-right">มูลค่ารวม (บาท)</th><th></th></tr></thead><tbody>'+data.map((g,i)=>'<tr class="border-t"><td class="p-2">'+escaped(g.name)+'</td><td class="p-2 text-right">'+g.assets.length+'</td><td class="p-2 text-right">'+g.known+'</td><td class="p-2 text-right font-semibold">'+money(g.total)+'</td><td class="p-2"><button data-group="'+i+'" class="nine-finance-detail text-blue-700 underline">ดูอุปกรณ์</button></td></tr>').join('')+'</tbody></table></div><div id="nine-finance-items" class="mt-3"></div></div>';
+ const groups=[
+  {id:"all",name:"มูลค่าทรัพย์สินรวม",hint:"ทุกสถานะ รวมที่เบิกใช้งานและส่งซ่อม",items:assets,color:"slate"},
+  {id:"available",name:"มูลค่าพร้อมใช้งาน",hint:"สถานะพร้อมใช้งาน (Available)",items:assets.filter(a=>a.status==="available"),color:"emerald"},
+  {id:"retired",name:"มูลค่าปลดระวาง",hint:"สถานะปลดระวาง (Retired)",items:assets.filter(a=>a.status==="retired"),color:"amber"}
+ ].map(g=>({
+  ...g,value:g.items.filter(valid).reduce((sum,a)=>sum+Number(a.assetValue),0),
+  known:g.items.filter(valid).length,
+  missing:g.items.filter(a=>!valid(a)).length
+ }));
+ if(!groups.some(g=>g.id===selectedStatus))selectedStatus="all";
+ const current=groups.find(g=>g.id===selectedStatus);
+ const tile=g=>'<button type="button" data-value-status="'+g.id+'" aria-pressed="'+(selectedStatus===g.id)+'" class="nine-value-status text-left border rounded-xl p-4 transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 '+(selectedStatus===g.id?'border-blue-500 bg-blue-50':'border-slate-200 bg-slate-50/60')+'">'+
+  '<div class="text-sm font-semibold text-slate-600">'+g.name+'</div>'+
+  '<div class="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tabular-nums">฿'+money(g.value)+'</div>'+
+  '<div class="text-xs text-slate-600 mt-2">'+g.items.length+' รายการ · ระบุมูลค่า '+g.known+(g.missing?' · <span class="text-amber-700">ไม่ระบุ '+g.missing+'</span>':'')+'</div>'+
+  '<div class="text-xs text-blue-700 font-semibold mt-2">คลิกดูรายการอุปกรณ์</div></button>';
+ const details=current.items.length?current.items.map(a=>
+  '<tr class="border-t"><td class="p-2 font-mono font-semibold">'+escaped(a.id)+'</td><td class="p-2">'+escaped(a.assetType||a.category)+'</td><td class="p-2">'+escaped(a.brand)+' '+escaped(a.model)+'</td><td class="p-2">'+escaped(a.status)+'</td><td class="p-2 text-right whitespace-nowrap">'+(valid(a)?'฿'+money(a.assetValue):'<span class="text-amber-700">ยังไม่ระบุ</span>')+'</td></tr>').join(''):
+  '<tr><td colspan="5" class="p-5 text-center text-slate-500">ไม่มีทรัพย์สินในสถานะนี้</td></tr>';
+ card.innerHTML='<div class="flex flex-wrap justify-between gap-3 items-center mb-4"><div><h3 class="text-lg font-bold text-slate-800">สรุปมูลค่าทรัพย์สินตามสถานะ</h3><p class="text-xs text-slate-500 mt-1">ข้อมูลจาก SharePoint Master Asset Inventory · มูลค่าตามที่บันทึก ไม่ใช่มูลค่าหลังหักค่าเสื่อม</p></div>'+
+  (master&&admin()?'<button id="nine-prepare-value" class="border bg-white px-4 py-2 rounded-xl text-sm">เตรียมคอลัมน์มูลค่า / ซิงก์ Host name</button>':'')+'</div>'+
+  '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">'+groups.map(tile).join('')+'</div>'+
+  (unknown?'<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">ยังไม่ระบุมูลค่า '+unknown+' จาก '+assets.length+' รายการ จึงแสดงเฉพาะยอดรวมของอุปกรณ์ที่มีมูลค่าบันทึกไว้ ไม่ถือว่ารายการว่างมีมูลค่า 0 บาท</p>':'')+
+  '<div class="mt-4 rounded-xl border border-slate-200 overflow-hidden"><div class="flex flex-wrap justify-between items-center p-3 bg-slate-50 gap-2"><div class="font-semibold text-slate-800">รายการ: '+current.name+' <span class="text-sm text-slate-500">('+current.items.length+' ชิ้น)</span></div><div class="text-sm font-semibold">฿'+money(current.value)+'</div></div>'+
+  '<div class="overflow-x-auto max-h-80 overflow-y-auto"><table class="w-full min-w-[650px] text-sm"><thead class="bg-slate-50 sticky top-0"><tr><th class="p-2 text-left">Asset ID</th><th class="p-2 text-left">ประเภท</th><th class="p-2 text-left">ยี่ห้อ / รุ่น</th><th class="p-2 text-left">สถานะ</th><th class="p-2 text-right">มูลค่า</th></tr></thead><tbody>'+details+'</tbody></table></div></div>'+
+  '<div class="flex items-center justify-between flex-wrap gap-3 mt-5"><div class="font-semibold text-slate-800">มูลค่าแยกตามประเภท (ทุกสถานะ)</div><button id="nine-breakdown-btn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm">'+(expanded?'ซ่อนมูลค่าแยกประเภท':'ดูมูลค่าแยกประเภท')+'</button></div>'+
+  '<div id="nine-breakdown" class="mt-3 '+(expanded?'':'hidden')+'"><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-slate-50"><th class="p-2 text-left">หมวดหมู่</th><th class="p-2 text-right">จำนวน</th><th class="p-2 text-right">มีมูลค่า</th><th class="p-2 text-right">มูลค่ารวม (บาท)</th><th></th></tr></thead><tbody>'+
+  data.map((g,i)=>'<tr class="border-t"><td class="p-2">'+escaped(g.name)+'</td><td class="p-2 text-right">'+g.assets.length+'</td><td class="p-2 text-right">'+g.known+'</td><td class="p-2 text-right font-semibold">'+money(g.total)+'</td><td class="p-2"><button data-group="'+i+'" class="nine-finance-detail text-blue-700 underline">ดูอุปกรณ์</button></td></tr>').join('')+'</tbody></table></div><div id="nine-finance-items" class="mt-3"></div></div>';
+ card.querySelectorAll(".nine-value-status").forEach(b=>b.onclick=()=>{selectedStatus=b.dataset.valueStatus;draw()});
  document.getElementById("nine-breakdown-btn").onclick=()=>{expanded=!expanded;draw()};
  document.getElementById("nine-prepare-value")?.addEventListener("click",prepare);
  card.querySelectorAll(".nine-finance-detail").forEach(b=>b.onclick=()=>{
