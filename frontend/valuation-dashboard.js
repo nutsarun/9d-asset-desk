@@ -52,7 +52,7 @@ function draw(){
  const groups=[
   {id:"all",name:"มูลค่าทรัพย์สินรวม",hint:"ทุกสถานะ รวมที่เบิกใช้งานและส่งซ่อม",items:assets,color:"slate"},
   {id:"available",name:"มูลค่าพร้อมใช้งาน",hint:"สถานะพร้อมใช้งาน (Available)",items:assets.filter(a=>a.status==="available"),color:"emerald"},
-  {id:"retired",name:"มูลค่าปลดระวาง",hint:"สถานะปลดระวาง (Retired)",items:assets.filter(a=>a.status==="retired"),color:"amber"}
+  {id:"retired",name:"มูลค่าปลดระวาง",hint:"รวม Retired, Not available และ Lost ตามการจัดสถานะปัจจุบัน",items:assets.filter(a=>a.status==="retired"),color:"amber"}
  ].map(g=>({
   ...g,value:g.items.filter(valid).reduce((sum,a)=>sum+Number(a.assetValue),0),
   known:g.items.filter(valid).length,
