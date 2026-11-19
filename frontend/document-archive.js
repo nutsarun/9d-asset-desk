@@ -101,22 +101,23 @@ function persist(){
  try{sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions))}catch(e){console.warn('Cannot cache document link',e)}
  if(typeof renderHistory==='function')renderHistory();
 }
-async function archiveTransaction(tx){
+async function archiveTransaction(tx,{replaceExisting=false}={}){
  if(!tx||!DIRS[tx.type]||!tx.docNo||!tx.employee?.name)return {ok:false,error:'ข้อมูลเอกสารไม่ครบ'};
- if(tx.pdfStatus==='saved'&&tx.pdfUrl)return {ok:true,url:tx.pdfUrl,alreadySaved:true};
+ if(tx.pdfStatus==='saved'&&tx.pdfUrl&&!replaceExisting)return {ok:true,url:tx.pdfUrl,alreadySaved:true};
  if(tx.pdfStatus==='saving')return {ok:false,error:'กำลังบันทึกไฟล์ PDF'};
  tx.pdfStatus='saving';persist();
  const name=filename(tx),folder=folderPath(tx),url=ROOT+'/'+folder+'/'+encodeURIComponent(name);
  try{
   // Collision avoidance: never silently overwrite a previous HO/RT document.
   const old=await graph(url,'GET');
-  if(old){
+  if(old&&!replaceExisting){
    tx.pdfStatus='conflict';tx.pdfError='มีไฟล์ชื่อ '+name+' อยู่แล้ว ต้องตรวจสอบเลขที่เอกสารใน SharePoint ก่อน';persist();
    throw Error(tx.pdfError);
   }
+  if(replaceExisting&&!old)throw Error('ไม่พบไฟล์เดิมที่จะซ่อมแซมใน SharePoint');
   const pdf=await pdfBlob(tx);
   // If-None-Match is an additional race-condition guard; folders must be writeable by the logged-in staff member.
-  const uploaded=await graph(url+':/content','PUT',pdf,'application/pdf',{'If-None-Match':'*'});
+  const uploaded=await graph(url+':/content','PUT',pdf,'application/pdf',replaceExisting?(old.eTag?{'If-Match':old.eTag}:{}):{'If-None-Match':'*'});
   if(!uploaded?.id||!uploaded.webUrl)throw Error('ไม่ได้รับข้อมูลยืนยันไฟล์จาก SharePoint');
   tx.pdfStatus='saved';tx.pdfUrl=uploaded.webUrl;tx.pdfName=name;tx.pdfError='';
   persist();
@@ -130,6 +131,13 @@ async function archiveTransaction(tx){
  }
 }
 window.nineDocumentArchive={archiveTransaction,filename,folderPath};
+window.nineRepairArchive=async function(docNo){
+ const tx=transactions.find(t=>t.docNo===docNo);
+ if(!tx)return showToast('ไม่พบข้อมูลเอกสารในเบราว์เซอร์นี้','error');
+ if(!tx.pdfUrl&&!tx.pdfName)return showToast('เอกสารยังไม่เคยถูกจัดเก็บ โปรดใช้ปุ่มบันทึก PDF ก่อน','error');
+ if(!confirm('ต้องการสร้าง PDF ใหม่และแทนที่ไฟล์เดิมใน SharePoint สำหรับ '+docNo+' หรือไม่?\n\nใช้สำหรับซ่อมไฟล์ PDF ที่เป็นกระดาษเปล่าเท่านั้น และไม่ทำธุรกรรม HO/RT ซ้ำ'))return;
+ return archiveTransaction(tx,{replaceExisting:true});
+};
 window.nineRetryArchive=async function(docNo){
  const tx=transactions.find(t=>t.docNo===docNo);
  if(!tx)return showToast('ไม่พบข้อมูลเอกสารในเบราว์เซอร์นี้','error');
