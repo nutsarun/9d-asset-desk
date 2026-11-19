@@ -56,7 +56,7 @@ async function snapshot(){
  return result;
 }
 function fileName(created){
- const time=created.replace(/[-:]/g,'').replace('T','_').replace(/\.\d+Z$/,'Z');
+ const time=created.replace(/[-:]/g,'').replace('T','_').replace('.','_');
  return '9D_Master_Assets_'+time+'.json';
 }
 function downloadJson(data,name){
@@ -73,6 +73,10 @@ async function uploadJson(data){
  await folderExists(true);
  const name=fileName(data.createdAt);
  const path=PREFIX+'/drive/root:/'+FOLDER_ESC+'/'+encodeURIComponent(name)+':/content';
+ // Never silently overwrite an existing backup file.
+ try{await graph(PREFIX+'/drive/root:/'+FOLDER_ESC+'/'+encodeURIComponent(name));
+   throw Error('มี Snapshot ชื่อนี้อยู่แล้ว ไม่อนุญาตให้เขียนทับ');
+ }catch(err){if(!/HTTP 404/.test(err.message))throw err}
  const payload=JSON.stringify(data,null,2);
  // Only small snapshots supported with this simple PUT; large snapshots need upload sessions.
  if(new Blob([payload]).size>3.8*1024*1024)throw Error('ไฟล์เกิน 3.8MB กรุณาดาวน์โหลดสำรองหรือใช้ Upload Session');
