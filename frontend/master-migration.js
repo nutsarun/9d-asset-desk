@@ -11,7 +11,12 @@
    return {id:MASTER_ID,displayName:'9D Master Asset Inventory'};
  }
  function buildMenu(){
-   if(document.getElementById('nav-master'))return;
+   // Login runs after DOMContentLoaded; mount privileged tools again on each authenticated call.
+   if(document.getElementById('nav-master')){
+     document.getElementById('nav-master').classList.toggle('hidden',!isAdmin());
+     window.nineDatabaseBackup?.mount?.();
+     return;
+   }
    const nav=document.querySelector('#sidebar nav');
    if(!nav)return;
    const btn=document.createElement('button');btn.id='nav-master';btn.dataset.tab='master';
