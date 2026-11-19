@@ -305,6 +305,7 @@ window.nineCheckout=async function(ev){
  const date=document.getElementById('co-date').value;
  if(!employee.name||!employee.empId||!selected.length)return showToast('กรุณาระบุพนักงานและเลือกอุปกรณ์','error');
  const button=ev.submitter;if(button)button.disabled=true;
+ let archiveTx=null;
  const done=[],errors=[];
  try{
   for(const a of selected) {
@@ -314,10 +315,13 @@ window.nineCheckout=async function(ev){
   if(done.length){
    const tx={docNo:generateDocNumber('HO'),type:'CHECKOUT',date,employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:document.getElementById('co-note').value})),note:document.getElementById('co-note').value,officerName:currentUser.name+' ('+currentUser.email+')'};
    transactions.unshift(tx);
+   archiveTx=tx;
    sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions));
   }
   checkoutCart=[];await refreshAssetData();
   showToast(done.length+' รายการบันทึกลง SharePoint'+(errors.length?' / '+errors.length+' รายการไม่สำเร็จ: '+errors.join(' | '):''),errors.length?'error':'success');
+  // Asset records are already committed. PDF upload failures must never re-run checkout.
+  if(archiveTx)await window.nineDocumentArchive?.archiveTransaction(archiveTx);
  }catch(e){showToast(e.message,'error');}finally{if(button)button.disabled=false;}
 };
 window.nineCheckin=async function(ev,groupKey){
@@ -325,16 +329,21 @@ window.nineCheckin=async function(ev,groupKey){
  const inputs=[...ev.target.querySelectorAll('input[name="return_asset"]:checked')];
  if(!inputs.length)return showToast('กรุณาเลือกอุปกรณ์ที่จะคืน','error');
  const grp=groupAssignedAssetsByEmployee()[groupKey];if(!grp)return;
+ let archiveTx=null;
  const done=[],errors=[];
  for(const cb of inputs){
   const a=assets.find(x=>x.id===cb.value);if(!a)continue;
   try{await checkinItem(a);done.push(a);}catch(e){errors.push(e.message);}
  }
  if(done.length){
-  transactions.unshift({docNo:generateDocNumber('RT'),type:'CHECKIN',date:ev.target.querySelector('input[name="return_date"]').value,employee:grp.employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:'รับคืน'})),note:ev.target.querySelector('input[name="return_note"]').value,officerName:currentUser.name+' ('+currentUser.email+')'});
+  const tx={docNo:generateDocNumber('RT'),type:'CHECKIN',date:ev.target.querySelector('input[name="return_date"]').value,employee:grp.employee,items:done.map(a=>({id:a.id,category:a.category,brand:a.brand,model:a.model,serial:a.serial,condition:'รับคืน'})),note:ev.target.querySelector('input[name="return_note"]').value,officerName:currentUser.name+' ('+currentUser.email+')'};
+  transactions.unshift(tx);
+  archiveTx=tx;
   sessionStorage.setItem('nine-transactions-session',JSON.stringify(transactions));
  }
  await refreshAssetData();showToast('คืนสำเร็จ '+done.length+' รายการ'+(errors.length?' / ผิดพลาด: '+errors.join(' | '):''),errors.length?'error':'success');
+ // PDF archived only after successful SharePoint asset write; separate failure path.
+ if(archiveTx)await window.nineDocumentArchive?.archiveTransaction(archiveTx);
 };
 
 const ASSET_CODES={Notebook:'N',Monitor:'M',Smartphone:'S',Accessory:'A',Mouse:'MO',Network:'W',Other:'O'};
