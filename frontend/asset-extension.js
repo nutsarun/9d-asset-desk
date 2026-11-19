@@ -78,7 +78,7 @@ function ensurePanel(){
  b.dataset.tab='employees';b.innerHTML='<i data-lucide="users" class="w-5 h-5"></i><span>ข้อมูลพนักงาน (Employees)</span>';
  b.onclick=()=>switchTab('employees');nav.insertBefore(b,document.querySelector('#nav-sso-settings'));
  const sec=document.createElement('section');sec.id='tab-employees';sec.className='tab-content hidden space-y-5';
- sec.innerHTML='<div class="flex flex-wrap justify-between gap-3 items-center"><div><h2 class="text-2xl font-bold">ข้อมูลพนักงาน</h2><p class="text-sm text-slate-500">เชื่อมโยงผู้ถือครองจาก SharePoint และจัดการข้อมูลพนักงาน</p></div><button id="emp-add" class="bg-blue-600 text-white px-4 py-2 rounded-xl" onclick="nineEmployeeEdit(-1)">+ เพิ่มพนักงาน</button></div><div id="emp-source" class="rounded-xl p-3 border text-sm"></div><input id="emp-search" oninput="renderEmployees()" class="w-full bg-white border rounded-xl p-3" placeholder="ค้นหาชื่อพนักงาน รหัส แผนก และอีเมล"><div id="employee-list" class="bg-white rounded-xl border overflow-x-auto"></div><div id="emp-modal" class="fixed inset-0 z-50 bg-black/50 hidden items-center justify-center p-4"><form id="emp-form" onsubmit="nineEmployeeSave(event)" class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3"><h3 class="font-bold text-xl">เพิ่ม / แก้ไขพนักงาน</h3><input type="hidden" id="emp-index"><div class="grid grid-cols-2 gap-3"><label class="text-sm">รหัสพนักงาน<input id="emp-code" class="w-full border p-2 rounded-lg"></label><label class="text-sm">ชื่อ-นามสกุล *<input id="emp-name" required class="w-full border p-2 rounded-lg"></label><label class="text-sm">แผนก<input id="emp-department" class="w-full border p-2 rounded-lg"></label><label class="text-sm">ตำแหน่ง<input id="emp-position" class="w-full border p-2 rounded-lg"></label><label class="text-sm">อีเมล<input type="email" id="emp-email" class="w-full border p-2 rounded-lg"></label><label class="text-sm">เบอร์โทร<input id="emp-contact" class="w-full border p-2 rounded-lg"></label></div><div class="flex justify-end gap-2"><button type="button" onclick="document.getElementById(\'emp-modal\').classList.add(\'hidden\');document.getElementById(\'emp-modal\').classList.remove(\'flex\')" class="border rounded-lg px-4 py-2">ยกเลิก</button><button class="bg-blue-600 text-white rounded-lg px-4 py-2" type="submit">บันทึก</button></div></form></div>';
+ sec.innerHTML='<div class="flex flex-wrap justify-between gap-3 items-center"><div><h2 class="text-2xl font-bold">ข้อมูลพนักงาน</h2><p class="text-sm text-slate-500">เชื่อมโยงผู้ถือครองจาก SharePoint และจัดการข้อมูลพนักงาน</p></div><button id="emp-add" class="bg-blue-600 text-white px-4 py-2 rounded-xl" onclick="nineEmployeeEdit(-1)">+ เพิ่มพนักงาน</button></div><div id="emp-source" class="rounded-xl p-3 border text-sm"></div><div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end"><input id="emp-search" oninput="renderEmployees()" class="flex-1 min-w-0 bg-white border rounded-xl p-3" placeholder="ค้นหาชื่อ รหัส แผนก ตำแหน่ง โทรศัพท์ หรือบริษัท"><label class="text-sm font-semibold text-slate-700 sm:w-64">เรียงลำดับตาม<select id="emp-sort" onchange="renderEmployees()" class="block w-full mt-1 bg-white border rounded-xl p-3 text-sm font-normal"><option value="name">ชื่อพนักงาน (ก–ฮ / A–Z)</option><option value="id">รหัสพนักงาน</option><option value="department">แผนก</option></select></label></div><div id="employee-list" class="bg-white rounded-xl border overflow-x-auto"></div><div id="emp-modal" class="fixed inset-0 z-50 bg-black/50 hidden items-center justify-center p-4"><form id="emp-form" onsubmit="nineEmployeeSave(event)" class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3"><h3 class="font-bold text-xl">เพิ่ม / แก้ไขพนักงาน</h3><input type="hidden" id="emp-index"><div class="grid grid-cols-2 gap-3"><label class="text-sm">รหัสพนักงาน<input id="emp-code" class="w-full border p-2 rounded-lg"></label><label class="text-sm">ชื่อ-นามสกุล *<input id="emp-name" required class="w-full border p-2 rounded-lg"></label><label class="text-sm">แผนก<input id="emp-department" class="w-full border p-2 rounded-lg"></label><label class="text-sm">ตำแหน่ง<input id="emp-position" class="w-full border p-2 rounded-lg"></label><label class="text-sm">อีเมล<input type="email" id="emp-email" class="w-full border p-2 rounded-lg"></label><label class="text-sm">เบอร์โทร<input id="emp-contact" class="w-full border p-2 rounded-lg"></label></div><div class="flex justify-end gap-2"><button type="button" onclick="document.getElementById(\'emp-modal\').classList.add(\'hidden\');document.getElementById(\'emp-modal\').classList.remove(\'flex\')" class="border rounded-lg px-4 py-2">ยกเลิก</button><button class="bg-blue-600 text-white rounded-lg px-4 py-2" type="submit">บันทึก</button></div></form></div>';
  document.querySelector('main').appendChild(sec);window.lucide?.createIcons();
 }
 function renderEmployees(){
@@ -89,10 +89,34 @@ function renderEmployees(){
  src.className='rounded-xl p-3 border text-sm '+(employeeListId?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900');
  src.textContent=employeeListId?'ข้อมูลพนักงานเชื่อมกับ SharePoint List: '+EMP_LIST_NAME:'ยังไม่มี SharePoint List "'+EMP_LIST_NAME+'" — ข้อมูลพนักงานที่เพิ่ม/แก้ไขจะเก็บเฉพาะเบราว์เซอร์นี้ ไม่แชร์กับผู้อื่น กรุณาสร้าง List ตามคู่มือใน GitHub เพื่อเปิดการซิงก์';
  const query=norm(document.getElementById('emp-search')?.value);
- const filtered=directory.map((e,i)=>({...e,_index:i})).filter(e=>norm(Object.values(e).join(' ')).includes(query));
+ const sortBy=document.getElementById('emp-sort')?.value||'name';
+ const filtered=directory.map((e,i)=>({...e,_index:i}))
+  .filter(e=>norm([e.name,e.empId,e.department,e.position,e.email,e.contact,e.company].join(' ')).includes(query));
+ const compare=(a,b)=>String(a||'').localeCompare(String(b||''),'th',{numeric:true,sensitivity:'base'});
+ const nonempty=(a,b)=>!String(a||'').trim()?(!String(b||'').trim()?0:1):(!String(b||'').trim()?-1:compare(a,b));
+ filtered.sort((a,b)=>{
+  if(sortBy==='id')return nonempty(a.empId,b.empId)||compare(a.name,b.name);
+  if(sortBy==='department')return nonempty(a.department,b.department)||compare(a.name,b.name);
+  return compare(a.name,b.name)||compare(a.empId,b.empId);
+ });
  const counts=new Map();
  for(const a of assets)if(a.assignedTo?.name){const k=norm(a.assignedTo.name);counts.set(k,(counts.get(k)||0)+1);}
- root.innerHTML='<table class="min-w-full text-sm"><thead class="bg-slate-50"><tr><th class="p-3 text-left">ชื่อพนักงาน</th><th class="p-3 text-left">แผนก / อีเมล</th><th class="p-3">อุปกรณ์ที่ถือครอง</th><th class="p-3">จัดการ</th></tr></thead><tbody>'+filtered.map(e=>'<tr class="border-t"><td class="p-3 font-semibold">'+esc(e.name)+'<p class="text-xs text-slate-500">'+esc(e.empId)+'</p></td><td class="p-3">'+esc(e.department)+'<p class="text-xs text-slate-500">'+esc(e.email)+'</p></td><td class="p-3 text-center">'+(counts.get(norm(e.name))||0)+'</td><td class="p-3 text-center">'+(isAdmin?'<button class="text-blue-700 mr-3" onclick="nineEmployeeEdit('+e._index+')">แก้ไข</button><button class="text-rose-600" onclick="nineEmployeeDelete('+e._index+')">ลบ</button>':'ดูอย่างเดียว')+'</td></tr>').join('')+'</tbody></table>';
+ root.innerHTML='<table class="min-w-[1100px] w-full text-sm"><thead class="bg-slate-50"><tr>'+
+  '<th class="p-3 text-left">ชื่อพนักงาน / รหัส</th>'+
+  '<th class="p-3 text-left">แผนก / ตำแหน่ง</th>'+
+  '<th class="p-3 text-left">อีเมล / เบอร์โทรศัพท์</th>'+
+  '<th class="p-3 text-left">สังกัดบริษัท</th>'+
+  '<th class="p-3 text-center">อุปกรณ์ที่ถือครอง</th>'+
+  '<th class="p-3 text-center">จัดการ</th></tr></thead><tbody>'+
+  (filtered.length?filtered.map(e=>'<tr class="border-t hover:bg-slate-50/70">'+
+   '<td class="p-3 font-semibold text-slate-800">'+esc(e.name||'-')+'<p class="text-xs font-normal text-slate-500 mt-1">'+esc(e.empId||'ไม่ระบุรหัส')+'</p></td>'+
+   '<td class="p-3">'+esc(e.department||'-')+'<p class="text-xs text-slate-500 mt-1">'+esc(e.position||'ไม่ระบุตำแหน่ง')+'</p></td>'+
+   '<td class="p-3"><div class="break-all">'+esc(e.email||'-')+'</div><p class="text-xs text-slate-600 mt-1">'+esc(e.contact||'ไม่ระบุเบอร์โทร')+'</p></td>'+
+   '<td class="p-3">'+esc(e.company||'-')+'</td>'+
+   '<td class="p-3 text-center font-semibold">'+(counts.get(norm(e.name))||0)+'</td>'+
+   '<td class="p-3 text-center whitespace-nowrap">'+(isAdmin?'<button class="text-blue-700 mr-3" onclick="nineEmployeeEdit('+e._index+')">แก้ไข</button><button class="text-rose-600" onclick="nineEmployeeDelete('+e._index+')">ลบ</button>':'ดูอย่างเดียว')+'</td></tr>').join(''):
+   '<tr><td colspan="6" class="p-8 text-center text-slate-500">ไม่พบข้อมูลพนักงานตามเงื่อนไขที่ค้นหา</td></tr>')+
+  '</tbody></table>';
 }
 window.renderEmployees=renderEmployees;
 window.nineEmployeeEdit=function(index){
